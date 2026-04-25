@@ -14,12 +14,9 @@ if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
 endif()
 
 set(SOURCES
-  cpp/wst_bindings.cpp
+  cpp/wst_bindings.cu
   cpp/memory_staging.cu
 )
-
-# Compile bindings as CUDA since they instantiate CUDA templates
-set_source_files_properties(cpp/wst_bindings.cpp PROPERTIES LANGUAGE CUDA)
 
 pybind11_add_module(_core MODULE ${SOURCES})
 
