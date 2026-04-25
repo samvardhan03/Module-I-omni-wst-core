@@ -1,22 +1,18 @@
 [build-system]
-requires = ["scikit-build-core", "pybind11", "cmake"]
+requires = ["scikit-build-core>=0.9", "pybind11>=2.12", "cmake>=3.18", "ninja"]
 build-backend = "scikit_build_core.build"
 
 [project]
 name = "omni-wst-core"
 version = "1.0.0"
-description = "Phase 1: C++/CUDA Mathematical Primitives for OmniPulse"
-readme = "README.md"
+description = "OmniPulse WST/JTFS C++/CUDA perceptual hashing engine"
 requires-python = ">=3.10"
-dependencies = [
-    "numpy>=1.26"
-]
+dependencies = ["numpy>=1.26"]
 
 [project.optional-dependencies]
-test = [
-    "pytest>=7.0",
-]
+dev = ["pytest>=8.0", "pytest-benchmark"]
 
 [tool.scikit-build]
 cmake.build-type = "Release"
-cmake.args = ["-DCUDA_ARCH=native", "-DBUILD_PYBIND11=ON", "-DCOMMERCIAL_USE=ON"]
+cmake.args = ["-DCUDA_ARCH=native"]
+wheel.packages = ["src/omni_wst_core"]

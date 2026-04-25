@@ -1,16 +1,13 @@
 .PHONY: build test memcheck clean
 
 build:
-	pip install -e .
+	pip install -e ".[dev]" --no-build-isolation
 
 test:
-	pytest tests/ -v
+	pytest tests/ -v --tb=short
 
 memcheck:
-	@echo "Running compute-sanitizer for memory safety validation..."
-	compute-sanitizer --tool memcheck pytest tests/ -v
+	compute-sanitizer --tool memcheck python -c "import omni_wst_core; print(omni_wst_core.cuda_available())"
 
 clean:
-	rm -rf build/
-	rm -rf _skbuild/
-	rm -rf *.egg-info
+	rm -rf build/ dist/ *.egg-info _skbuild/

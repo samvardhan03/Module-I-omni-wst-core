@@ -3,97 +3,87 @@
 
 #include "wst_kernel.cuh"
 
-// Config parameter struct for JTFS
+// JTFS Configuration
 struct JTFSConfig {
+    int J;
+    int Q;
     int J_fr;
     int Q_fr;
+    int depth;
 };
 
-// Phase 1 Kernel (Time-axis convolution wrapper)
-__global__ void time_conv_kernel(Complex* U1, Complex* psi_mu, Complex* out, int time_len, int freq_len) {
+// Phase 1 Kernel (Time-axis convolution)
+__global__ void launch_time_conv(const cufftComplex* d_scalogram, const cufftComplex* d_psi_mu, cufftComplex* d_intermediate, int Lambda1, int T, int mu_count, int batch) {
     int t = blockIdx.x * blockDim.x + threadIdx.x;
     int lambda = blockIdx.y * blockDim.y + threadIdx.y;
-    
-    if (t < time_len && lambda < freq_len) {
-        int idx = lambda * time_len + t;
-        // pointwise multiplication across time
-        Complex res;
-        res.x = U1[idx].x * psi_mu[t].x - U1[idx].y * psi_mu[t].y;
-        res.y = U1[idx].x * psi_mu[t].y + U1[idx].y * psi_mu[t].x;
-        out[idx] = res;
+    int b = blockIdx.z;
+
+    if (t < T && lambda < Lambda1 && b < batch) {
+        // Mock convolution mapping
+        int idx = (b * Lambda1 + lambda) * T + t;
+        int mu_idx = lambda % mu_count; // Simplified modulation indexing
+
+        cufftComplex s = d_scalogram[idx];
+        cufftComplex p = d_psi_mu[mu_idx * T + t];
+
+        cufftComplex res;
+        res.x = s.x * p.x - s.y * p.y;
+        res.y = s.x * p.y + s.y * p.x;
+
+        d_intermediate[idx] = res;
     }
 }
 
-// Phase 2 Kernel (Log-frequency convolution wrapper)
-__global__ void freq_conv_kernel(Complex* intermediate, Complex* psi_l_s, Complex* out, int time_len, int freq_len) {
+// Phase 2 Kernel (Log-frequency convolution)
+__global__ void launch_freq_conv(const cufftComplex* d_intermediate, const cufftComplex* d_psi_ls, float* d_jtfs_out, int Lambda1, int T, int ls_count, int batch) {
     int t = blockIdx.x * blockDim.x + threadIdx.x;
     int lambda = blockIdx.y * blockDim.y + threadIdx.y;
-    
-    if (t < time_len && lambda < freq_len) {
-        int idx = lambda * time_len + t;
-        // pointwise multiplication across frequency
-        Complex res;
-        res.x = intermediate[idx].x * psi_l_s[lambda].x - intermediate[idx].y * psi_l_s[lambda].y;
-        res.y = intermediate[idx].x * psi_l_s[lambda].y + intermediate[idx].y * psi_l_s[lambda].x;
-        out[idx] = res;
+    int b = blockIdx.z;
+
+    if (t < T && lambda < Lambda1 && b < batch) {
+        int idx = (b * Lambda1 + lambda) * T + t;
+        int ls_idx = lambda % ls_count;
+
+        cufftComplex inter = d_intermediate[idx];
+        cufftComplex p = d_psi_ls[ls_idx * Lambda1 + lambda];
+
+        float rx = inter.x * p.x - inter.y * p.y;
+        float ry = inter.x * p.y + inter.y * p.x;
+
+        // Extract modulus for final scattering coefficient
+        d_jtfs_out[idx] = sqrtf(rx * rx + ry * ry);
     }
 }
 
 template<typename ArchTag, int J, int Q, int J_fr>
 class JTFSEngine : public WSTEngine<ArchTag, J, Q> {
 public:
-    JTFSEngine(const WSTConfig& cfg, const JTFSConfig& jtfs_cfg) 
-        : WSTEngine<ArchTag, J, Q>(cfg), jtfs_config_(jtfs_cfg) {
-        // Pre-allocate d_freq_filter_bank
-        int lambda_in = J * Q;
-        int num_freq_filters = J_fr * jtfs_cfg.Q_fr;
-        size_t bytes = num_freq_filters * lambda_in * sizeof(Complex);
-        
-        cudaError_t err = cudaMalloc(&d_freq_filter_bank_, bytes);
-        if (err != cudaSuccess) {
-            throw std::runtime_error("Failed to allocate d_freq_filter_bank");
-        }
-        
-        // Ensure zero initialization
-        cudaMemset(d_freq_filter_bank_, 0, bytes);
-        
-        // Create streams for two-phase execution
-        cudaStreamCreate(&stream0_);
-        cudaStreamCreate(&stream1_);
-    }
-    
-    ~JTFSEngine() override {
-        cudaFree(d_freq_filter_bank_);
-        cudaStreamDestroy(stream0_);
-        cudaStreamDestroy(stream1_);
+    cufftComplex* d_freq_filter_bank;
+    cufftComplex* d_jtfs_intermediate;
+    cufftComplex* d_time_wavelets;
+
+    JTFSEngine() : WSTEngine<ArchTag, J, Q>(), d_freq_filter_bank(nullptr), d_jtfs_intermediate(nullptr), d_time_wavelets(nullptr) {}
+
+    virtual ~JTFSEngine() {
+        if (d_freq_filter_bank) cudaFree(d_freq_filter_bank);
+        if (d_jtfs_intermediate) cudaFree(d_jtfs_intermediate);
+        if (d_time_wavelets) cudaFree(d_time_wavelets);
     }
 
-    // Launch separable 2D wavelet convolution
-    void launch_jtfs_pipeline(Complex* d_U1, Complex* d_psi_mu, Complex* d_psi_l_s, Complex* d_intermediate, Complex* d_out) {
-        int time_len = this->config_.signal_len;
-        int freq_len = J * Q;
-        
-        dim3 blockDim(16, 16);
-        dim3 gridDim((time_len + 15) / 16, (freq_len + 15) / 16);
-        
+    void jtfs_forward(const cufftComplex* d_scalogram, float* d_jtfs_out, int batch, int Lambda1, int T, int mu_count, int ls_count) {
+        dim3 block(16, 16, 1);
+        dim3 grid((T + 15) / 16, (Lambda1 + 15) / 16, batch);
+
         // Phase 1: Time-axis convolution on stream0
-        time_conv_kernel<<<gridDim, blockDim, 0, stream0_>>>(d_U1, d_psi_mu, d_intermediate, time_len, freq_len);
-        
-        // Barrier: Wait for Phase 1 to finish
-        cudaStreamSynchronize(stream0_);
-        
-        // Phase 2: Log-frequency convolution on stream1
-        freq_conv_kernel<<<gridDim, blockDim, 0, stream1_>>>(d_intermediate, d_psi_l_s, d_out, time_len, freq_len);
-        
-        // Barrier: Wait for Phase 2 to finish
-        cudaStreamSynchronize(stream1_);
-    }
+        launch_time_conv<<<grid, block, 0, this->stream0>>>(d_scalogram, d_time_wavelets, d_jtfs_intermediate, Lambda1, T, mu_count, batch);
 
-private:
-    JTFSConfig jtfs_config_;
-    Complex* d_freq_filter_bank_;
-    cudaStream_t stream0_;
-    cudaStream_t stream1_;
+        // Phase 2: Log-frequency convolution on stream1
+        launch_freq_conv<<<grid, block, 0, this->stream1>>>(d_jtfs_intermediate, d_freq_filter_bank, d_jtfs_out, Lambda1, T, ls_count, batch);
+
+        // Synchronize both streams to complete separable convolution
+        cudaStreamSynchronize(this->stream0);
+        cudaStreamSynchronize(this->stream1);
+    }
 };
 
 #endif // JTFS_KERNEL_CUH

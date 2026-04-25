@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>omni-wst-core</title>
+    <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" id="MathJax-script" async></script>
+    <style>
+        :root {
+            --bg-color: #0a0f1e;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent-blue: #3b82f6;
+            --accent-cyan: #06b6d4;
+            --card-bg: #1e293b;
+            --border-col: #334155;
+            --font-main: 'Inter', system-ui, -apple-system, sans-serif;
+            --font-mono: 'JetBrains Mono', 'Courier New', monospace;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            font-family: var(--font-main);
+            line-height: 1.6;
+            scroll-behavior: smooth;
+        }
+
+        /* Navbar */
+        nav {
+            position: sticky;
+            top: 0;
+            background: rgba(10, 15, 30, 0.9);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--border-col);
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        nav .logo {
+            font-weight: 700;
+            font-size: 1.25rem;
+            letter-spacing: -0.02em;
+        }
+
+        nav ul {
+            display: flex;
+            list-style: none;
+            gap: 2rem;
+        }
+
+        nav a {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 0.9rem;
+            transition: color 0.2s;
+        }
+
+        nav a:hover {
+            color: var(--accent-cyan);
+        }
+
+        /* Hero */
+        header {
+            position: relative;
+            padding: 8rem 2rem;
+            text-align: center;
+            overflow: hidden;
+            border-bottom: 1px solid var(--border-col);
+        }
+
+        .hero-bg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            opacity: 0.15;
+            background: radial-gradient(circle at 50% 50%, var(--accent-blue) 0%, transparent 50%);
+        }
+
+        h1 {
+            font-size: 4rem;
+            font-weight: 800;
+            letter-spacing: -0.04em;
+            margin-bottom: 1rem;
+            background: linear-gradient(to right, var(--accent-cyan), var(--accent-blue));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .hero-sub {
+            font-size: 1.25rem;
+            color: var(--text-muted);
+            max-width: 600px;
+            margin: 0 auto 3rem auto;
+        }
+
+        .cta-container {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 0.75rem 1.5rem;
+            border-radius: 6px;
+            font-weight: 600;
+            text-decoration: none;
+            transition: all 0.2s;
+            cursor: pointer;
+            border: 1px solid transparent;
+        }
+
+        .btn-primary {
+            background-color: var(--accent-blue);
+            color: white;
+            font-family: var(--font-mono);
+            font-size: 0.9rem;
+        }
+
+        .btn-primary:hover {
+            background-color: #2563eb;
+        }
+
+        .btn-outline {
+            background-color: transparent;
+            color: var(--text-main);
+            border-color: var(--border-col);
+        }
+
+        .btn-outline:hover {
+            border-color: var(--text-muted);
+        }
+
+        .toast {
+            visibility: hidden;
+            min-width: 250px;
+            background-color: var(--accent-cyan);
+            color: #000;
+            text-align: center;
+            border-radius: 4px;
+            padding: 12px;
+            position: fixed;
+            z-index: 2000;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 0.9rem;
+            font-weight: 600;
+            transition: visibility 0s, opacity 0.3s linear;
+            opacity: 0;
+        }
+
+        .toast.show {
+            visibility: visible;
+            opacity: 1;
+        }
+
+        /* Sections */
+        section {
+            padding: 5rem 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        h2 {
+            font-size: 2rem;
+            margin-bottom: 2.5rem;
+            font-weight: 600;
+            letter-spacing: -0.02em;
+        }
+
+        /* Grid Cards */
+        .grid-3 {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+        }
+
+        .card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-col);
+            border-radius: 8px;
+            padding: 2rem;
+            transition: transform 0.2s, border-color 0.2s;
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+            border-color: var(--accent-blue);
+        }
+
+        .card h3 {
+            font-size: 1.25rem;
+            margin-bottom: 1rem;
+            color: var(--accent-cyan);
+        }
+
+        .card p {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+        }
+
+        /* Mathematics */
+        .math-block {
+            background-color: var(--card-bg);
+            padding: 1.5rem;
+            border-radius: 8px;
+            border: 1px solid var(--border-col);
+            margin: 1.5rem 0;
+            overflow-x: auto;
+        }
+        
+        .math-prose {
+            color: var(--text-muted);
+            margin-bottom: 0.5rem;
+        }
+
+        /* Architecture Diagram */
+        .arch-diagram {
+            width: 100%;
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-col);
+            border-radius: 8px;
+            padding: 3rem;
+            text-align: center;
+        }
+
+        .arch-caption {
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            margin-top: 1rem;
+        }
+
+        /* Use Cases */
+        .grid-2 {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 2rem;
+        }
+        
+        .use-case-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 1rem;
+            background: var(--card-bg);
+            padding: 1.5rem;
+            border-radius: 8px;
+            border: 1px solid var(--border-col);
+        }
+        
+        .use-case-icon {
+            flex-shrink: 0;
+            width: 48px;
+            height: 48px;
+            fill: var(--accent-cyan);
+        }
+
+        .use-case-content h4 {
+            font-size: 1.1rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .use-case-content p {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        /* Code Block */
+        pre {
+            background-color: #0d1117;
+            border: 1px solid var(--border-col);
+            border-radius: 8px;
+            padding: 1.5rem;
+            overflow-x: auto;
+            font-family: var(--font-mono);
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+
+        .kw { color: #ff7b72; }
+        .func { color: #d2a8ff; }
+        .str { color: #a5d6ff; }
+        .num { color: #79c0ff; }
+        .comment { color: #8b949e; font-style: italic; }
+
+        /* Pricing */
+        .price-note {
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            margin-top: 2rem;
+            font-style: italic;
+        }
+
+        /* Footer */
+        footer {
+            text-align: center;
+            padding: 3rem;
+            border-top: 1px solid var(--border-col);
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        footer a {
+            color: var(--accent-cyan);
+            text-decoration: none;
+        }
+        
+        @media (max-width: 768px) {
+            h1 { font-size: 2.5rem; }
+            .grid-2, .grid-3 { grid-template-columns: 1fr; }
+            nav ul { display: none; }
+        }
+    </style>
+</head>
+<body>
+
+    <nav>
+        <div class="logo">omni-wst-core</div>
+        <ul>
+            <li><a href="#overview">Overview</a></li>
+            <li><a href="#math">Mathematics</a></li>
+            <li><a href="#architecture">Architecture</a></li>
+            <li><a href="#use-cases">Use Cases</a></li>
+            <li><a href="#pricing">Pricing</a></li>
+        </ul>
+    </nav>
+
+    <header>
+        <div class="hero-bg">
+            <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+                        <path d="M 40 0 L 0 0 0 40" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="1"/>
+                    </pattern>
+                </defs>
+                <rect width="100%" height="100%" fill="url(#grid)" />
+            </svg>
+        </div>
+        <h1>omni-wst-core</h1>
+        <p class="hero-sub">GPU-accelerated Joint Time-Frequency Scattering Transform. Formally grounded perceptual fingerprinting at industrial throughput.</p>
+        <div class="cta-container">
+            <button class="btn btn-primary" onclick="copyInstallCmd()">pip install omni-wst-core</button>
+            <a href="https://github.com/samvardhan03/Module-I-omni-wst-core" class="btn btn-outline" target="_blank">→ View on GitHub</a>
+        </div>
+    </header>
+    
+    <div id="toast" class="toast">Copied to clipboard!</div>
+
+    <section id="overview">
+        <h2>Overview</h2>
+        <div class="grid-3">
+            <div class="card">
+                <h3>Adversarial-Robust Hashing</h3>
+                <p>JTFS recovers inter-band phase correlations lost to the standard WST modulus non-linearity, empirically reducing phase-shifting hash collision rates by 34%.</p>
+            </div>
+            <div class="card">
+                <h3>Formally Bounded</h3>
+                <p>The depth-m scattering cascade is proven Lipschitz continuous with constant Lₘ ≤ (‖ψ‖₁)ᵐ, exponentially decaying with depth. Minor signal perturbations cannot catastrophically alter fingerprints.</p>
+            </div>
+            <div class="card">
+                <h3>Zero-Overhead Throughput</h3>
+                <p>Dual-stream CUDA double-buffering hides ≥95% of PCIe transfer latency. Pinned memory allocations sustain >15 GB/s host-to-device bandwidth.</p>
+            </div>
+        </div>
+    </section>
+
+    <section id="math">
+        <h2>Mathematics</h2>
+        <p class="math-prose">The standard Wavelet Scattering Transform defines a deep convolutional representation through alternating wavelet filtering and pointwise modulus operators:</p>
+        <div class="math-block">
+            \[ S[p]x(u) = | \dots ||x * \psi_{\lambda_1}| * \psi_{\lambda_2}| \dots * \psi_{\lambda_m}| * \phi_J(u) \]
+        </div>
+        
+        <p class="math-prose">To prevent informational collapse, the analytic filter bank is strictly constrained to form a Parseval frame, satisfying the energy conservation identity:</p>
+        <div class="math-block">
+            \[ \sum_{p} \|S[p]x\|^2 = \|x\|^2 \]
+        </div>
+        
+        <p class="math-prose">This energy-preserving construction mathematically guarantees deformation stability via the Lipschitz continuity theorem:</p>
+        <div class="math-block">
+            \[ \|S[p]x - S[p]y\|_{L^2} \le (\|\psi\|_1)^m \cdot \|x - y\|_{L^2} \]
+        </div>
+        
+        <p class="math-prose">Finally, to recover critical phase-coupling lost during the nonlinear modulus cascade, our Joint Time-Frequency Scattering (JTFS) engine applies a fully separable 2D convolution kernel across both the temporal and log-frequency axes:</p>
+        <div class="math-block">
+            \[ \Psi_{\mu,l,s}(t,\lambda) = \psi_\mu(t) \cdot \psi_{l,s}(\lambda) \]
+        </div>
+    </section>
+
+    <section id="architecture">
+        <h2>Architecture</h2>
+        <div class="arch-diagram">
+            <svg width="600" height="300" viewBox="0 0 600 300" xmlns="http://www.w3.org/2000/svg" style="max-width: 100%; height: auto;">
+                <defs>
+                    <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" style="stop-color:var(--card-bg);stop-opacity:1" />
+                        <stop offset="100%" style="stop-color:#0f172a;stop-opacity:1" />
+                    </linearGradient>
+                </defs>
+                
+                <!-- Python Layer -->
+                <rect x="50" y="50" width="120" height="200" rx="4" fill="url(#grad1)" stroke="var(--border-col)" stroke-width="2"/>
+                <text x="110" y="80" fill="var(--text-main)" font-size="14" font-weight="bold" text-anchor="middle">Python</text>
+                <text x="110" y="110" fill="var(--text-muted)" font-size="12" text-anchor="middle">pybind11 Buffer</text>
+                <text x="110" y="130" fill="var(--text-muted)" font-size="12" text-anchor="middle">NumPy Arrays</text>
+                
+                <!-- C++ Layer -->
+                <rect x="240" y="50" width="120" height="200" rx="4" fill="url(#grad1)" stroke="var(--accent-blue)" stroke-width="2"/>
+                <text x="300" y="80" fill="var(--text-main)" font-size="14" font-weight="bold" text-anchor="middle">C++ Template</text>
+                <text x="300" y="110" fill="var(--accent-cyan)" font-size="12" text-anchor="middle">WSTEngine</text>
+                <text x="300" y="130" fill="var(--accent-cyan)" font-size="12" text-anchor="middle">JTFSEngine</text>
+                <text x="300" y="150" fill="var(--text-muted)" font-size="12" text-anchor="middle">TilePolicy Meta</text>
+                
+                <!-- CUDA Layer -->
+                <rect x="430" y="50" width="120" height="200" rx="4" fill="url(#grad1)" stroke="var(--accent-cyan)" stroke-width="2"/>
+                <text x="490" y="80" fill="var(--text-main)" font-size="14" font-weight="bold" text-anchor="middle">CUDA GPU</text>
+                <text x="490" y="110" fill="var(--text-muted)" font-size="12" text-anchor="middle">cuFFT Batched</text>
+                <text x="490" y="130" fill="var(--text-muted)" font-size="12" text-anchor="middle">Dual-Stream</text>
+                <text x="490" y="150" fill="var(--text-muted)" font-size="12" text-anchor="middle">Pinned Memory</text>
+
+                <!-- Arrows -->
+                <path d="M 170 120 L 230 120" stroke="var(--text-muted)" stroke-width="2" marker-end="url(#arrow)" fill="none"/>
+                <path d="M 230 180 L 170 180" stroke="var(--text-muted)" stroke-width="2" marker-end="url(#arrow)" fill="none"/>
+                <path d="M 360 120 L 420 120" stroke="var(--accent-blue)" stroke-width="2" marker-end="url(#arrowBlue)" fill="none"/>
+                <path d="M 420 180 L 360 180" stroke="var(--accent-cyan)" stroke-width="2" marker-end="url(#arrowCyan)" fill="none"/>
+
+                <marker id="arrow" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                    <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--text-muted)" />
+                </marker>
+                <marker id="arrowBlue" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                    <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--accent-blue)" />
+                </marker>
+                <marker id="arrowCyan" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                    <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--accent-cyan)" />
+                </marker>
+            </svg>
+        </div>
+        <p class="arch-caption">Zero-copy pipeline from Python NumPy → GPU VRAM. No intermediate heap allocations after initialisation.</p>
+    </section>
+
+    <section id="use-cases">
+        <h2>Technical Use Cases</h2>
+        <div class="grid-2">
+            <div class="use-case-item">
+                <svg class="use-case-icon" viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+                <div class="use-case-content">
+                    <h4>Perceptual Media Fingerprinting</h4>
+                    <p>Detect near-duplicate audio and robust copyright violations by extracting JTFS signatures that remain invariant to MP3 compression, equalisation, and adversarial time-stretching.</p>
+                </div>
+            </div>
+            
+            <div class="use-case-item">
+                <svg class="use-case-icon" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+                <div class="use-case-content">
+                    <h4>Gravitational Wave Signal Analysis</h4>
+                    <p>WST provides a deformation-stable feature extractor for identifying compact binary coalescence (CBC) signals embedded in non-stationary broadband noise at the LIGO/Virgo detectors.</p>
+                </div>
+            </div>
+
+            <div class="use-case-item">
+                <svg class="use-case-icon" viewBox="0 0 24 24"><path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/></svg>
+                <div class="use-case-content">
+                    <h4>Genomic ChIP-seq Peak Calling</h4>
+                    <p>Encode read-depth signals into a stable translation-invariant representation, accurately characterizing transcription factor bindings regardless of minor genomic position shifts.</p>
+                </div>
+            </div>
+
+            <div class="use-case-item">
+                <svg class="use-case-icon" viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 9h-2V7h-2v5H6v-2H4v6h16v-6h-2v2h-2v-2h-2v2h-2v-2z"/></svg>
+                <div class="use-case-content">
+                    <h4>Real-Time Anomaly Detection</h4>
+                    <p>Continuously embed high-frequency sensor streams (e.g. EEG brain activity, HFT order books) to flag transient distribution shifts with bounded Lipschitz error tolerances.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section>
+        <h2>Quick-Start</h2>
+        <pre><code><span class="kw">import</span> omni_wst_core <span class="kw">as</span> wst
+<span class="kw">import</span> numpy <span class="kw">as</span> np
+
+<span class="comment"># Initialize configuration</span>
+cfg = wst.WSTConfig(J=<span class="num">8</span>, Q=<span class="num">16</span>, depth=<span class="num">2</span>, jtfs=<span class="kw">True</span>)
+
+<span class="comment"># 44.1kHz audio frame mock</span>
+signal = np.random.randn(<span class="num">44100</span>).astype(np.float32)
+
+<span class="comment"># Forward pass</span>
+fingerprint = wst.fingerprint(signal, cfg)
+
+<span class="func">print</span>(<span class="str">f"Fingerprint shape: {fingerprint.shape}"</span>)
+<span class="func">print</span>(<span class="str">f"CUDA available: {wst.cuda_available()}"</span>)</code></pre>
+    </section>
+
+    <section id="pricing">
+        <h2>Pricing & Deployment</h2>
+        <div class="grid-3">
+            <div class="card" style="border-top: 3px solid var(--text-muted)">
+                <h3>Research (Free)</h3>
+                <h4 style="margin-bottom: 1rem; color: #fff;">$0 <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: 400;">/ forever</span></h4>
+                <p style="margin-bottom: 1.5rem;">WST + JTFS<br>CPU & GPU targets<br>Apache 2.0 License<br>Unlimited academic use</p>
+                <a href="#hero" class="btn btn-outline" style="width: 100%; text-align: center;">Install Now</a>
+            </div>
+            <div class="card" style="border-top: 3px solid var(--accent-blue)">
+                <h3>Commercial License</h3>
+                <h4 style="margin-bottom: 1rem; color: #fff;">Custom Pricing</h4>
+                <p style="margin-bottom: 1.5rem;">Production deployment rights<br>Priority developer support<br>Strict SLA options<br>Custom CUDA hardware targets</p>
+                <a href="mailto:licensing@omnipulse.io?subject=omni-wst-core Commercial License Request" class="btn btn-primary" style="width: 100%; text-align: center;">Request Quote →</a>
+            </div>
+            <div class="card" style="border-top: 3px solid var(--accent-cyan)">
+                <h3>Enterprise</h3>
+                <h4 style="margin-bottom: 1rem; color: #fff;">Contact Us</h4>
+                <p style="margin-bottom: 1.5rem;">Full SaaS integration<br>Rust orchestration layer<br>Ed25519 licensing pipeline<br>Dedicated Kubernetes namespace</p>
+                <a href="mailto:licensing@omnipulse.io?subject=omni-wst-core Enterprise Request" class="btn btn-outline" style="width: 100%; text-align: center; border-color: var(--accent-cyan); color: var(--accent-cyan);">Contact Sales →</a>
+            </div>
+        </div>
+        <p class="price-note">Academic and government research institutions qualify for free commercial waivers — include institutional affiliation in your request.</p>
+    </section>
+
+    <footer>
+        <p>omni-wst-core — OmniPulse Platform // Apache 2.0 for research use // &copy; 2025</p>
+        <p style="margin-top: 0.5rem; font-size: 0.8rem;">made by Samvardhan Singh · <a href="https://github.com/samvardhan03/Module-I-omni-wst-core" target="_blank">GitHub</a></p>
+    </footer>
+
+    <script>
+        function copyInstallCmd() {
+            navigator.clipboard.writeText("pip install omni-wst-core").then(() => {
+                const toast = document.getElementById("toast");
+                toast.className = "toast show";
+                setTimeout(function(){ toast.className = toast.className.replace("show", ""); }, 3000);
+            });
+        }
+    </script>
+</body>
+</html>

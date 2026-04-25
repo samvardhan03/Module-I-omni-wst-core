@@ -1,32 +1,34 @@
-cmake_minimum_required(VERSION 3.24)
-project(omni-wst-core LANGUAGES CXX CUDA)
-
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
+cmake_minimum_required(VERSION 3.18)
+project(omni_wst_core LANGUAGES CXX CUDA)
 
 find_package(Python REQUIRED COMPONENTS Interpreter Development.Module)
 find_package(pybind11 CONFIG REQUIRED)
-
-# Link against cudart and cufft
 find_package(CUDAToolkit REQUIRED)
 
-option(COMMERCIAL_USE "Enable commercial enterprise features" OFF)
+set(CMAKE_CUDA_STANDARD 17)
+set(CMAKE_CXX_STANDARD 17)
 
-if(COMMERCIAL_USE)
-    add_compile_definitions(COMMERCIAL_USE=1)
+# Detect GPU architecture or default to sm_80
+if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
+  set(CMAKE_CUDA_ARCHITECTURES 80)
 endif()
 
-pybind11_add_module(_core MODULE 
-    cpp/wst_bindings.cpp 
-    cpp/memory_staging.cu
+set(SOURCES
+  cpp/wst_bindings.cpp
+  cpp/memory_staging.cu
 )
 
-target_include_directories(_core PRIVATE cpp)
+pybind11_add_module(_core MODULE ${SOURCES})
 
-target_link_libraries(_core PRIVATE 
-    CUDA::cudart
-    CUDA::cufft
+target_include_directories(_core PRIVATE cpp/)
+target_link_libraries(_core PRIVATE
+  CUDA::cudart
+  CUDA::cufft
 )
 
-# Install into the src/omni_wst_core directory
+target_compile_options(_core PRIVATE
+  $<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr -O3>
+  $<$<COMPILE_LANGUAGE:CXX>:-O3>
+)
+
 install(TARGETS _core DESTINATION omni_wst_core)

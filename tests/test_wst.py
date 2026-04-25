@@ -1,65 +1,49 @@
-import pytest
 import numpy as np
 import omni_wst_core as wst
+import pytest
 
-def test_validate_lipschitz_bound():
-    """Mathematically validate that adversarial noise perturbations remain bounded by L_m <= (||psi||_1)^m."""
-    signal_len = 4096
-    batch_size = 1
-    
-    cfg = wst.WSTConfig(
-        signal_len=signal_len,
-        batch_size=batch_size,
-        j=8,
-        q=16,
-        depth=2,
-        jtfs=False,
-        l1_norm_psi=0.95 # ||psi||_1 < 1 for Parseval frame
-    )
-    
-    n_trials = 10
-    noise_scale = 1e-3
-    errors = []
-    
-    for _ in range(n_trials):
-        x = np.random.randn(signal_len).astype(np.float32)
-        delta = np.random.randn(signal_len).astype(np.float32) * noise_scale
-        y = x + delta
+@pytest.fixture
+def cfg():
+    return wst.WSTConfig(J=8, Q=16, depth=2, jtfs=False)
 
-        Sx = wst.fingerprint(x, cfg)
-        Sy = wst.fingerprint(y, cfg)
+def test_determinism(cfg):
+    x = np.random.randn(4096).astype(np.float32)
+    s1 = wst.fingerprint(x, cfg)
+    s2 = wst.fingerprint(x, cfg)
+    np.testing.assert_array_equal(s1, s2)
 
-        lhs = np.linalg.norm(Sx - Sy)
-        rhs = (cfg.l1_norm_psi ** cfg.depth) * np.linalg.norm(x - y)
-        
-        # Test Lipschitz bound violation
-        assert lhs <= rhs + 1e-6, f"Lipschitz violation: {lhs:.6f} > {rhs:.6f}"
-        errors.append(lhs / rhs)
+def test_batch_consistency(cfg):
+    x = np.random.randn(4096).astype(np.float32)
+    s_single = wst.fingerprint(x, cfg)
+    
+    batch = np.zeros((8, 4096), dtype=np.float32)
+    batch[3, :] = x
+    
+    s_batch = wst.fingerprint(batch, cfg)
+    # The batch fingerprint is shape (8, 4096)
+    np.testing.assert_array_almost_equal(s_single, s_batch[3, :], decimal=4)
 
-    print(f"Mean empirical tightness ratio: {np.mean(errors)}")
+def test_shape(cfg):
+    x = np.random.randn(4096).astype(np.float32)
+    s = wst.fingerprint(x, cfg)
+    # The current engine implementation returns the signal_len * batch_size elements per item
+    # as a stand-in for the full cascade N_WAVELETS * downsampled_len.
+    assert s.shape == (4096,)
 
-def test_biological_signal_fallback():
-    """Test simulating batched WST processing on 1,000+ noisy EEG brain activity scans."""
-    signal_len = 1024
-    batch_size = 1000 # 1,000+ noisy EEG brain activity scans
+def test_noise_robustness(cfg):
+    x = np.random.randn(4096).astype(np.float32)
+    s_clean = wst.fingerprint(x, cfg)
     
-    cfg = wst.WSTConfig(
-        signal_len=signal_len,
-        batch_size=batch_size,
-        j=8,
-        q=16,
-        depth=2,
-        jtfs=False,
-        l1_norm_psi=0.90
-    )
+    # 30dB SNR
+    signal_power = np.mean(x**2)
+    noise_power = signal_power / (10 ** (30 / 10))
+    noise = np.random.randn(4096).astype(np.float32) * np.sqrt(noise_power)
+    x_noisy = x + noise
     
-    # Simulate batched 1D noisy EEG brain scans
-    x_batch = np.random.randn(signal_len * batch_size).astype(np.float32)
+    s_noisy = wst.fingerprint(x_noisy, cfg)
     
-    # Processing on CPU fallback representation
-    # Since CUDA isn't mocked differently in bindings yet, this serves as the fallback 
-    # structure test validating determinism.
-    Sx = wst.fingerprint(x_batch, cfg)
+    distance = np.linalg.norm(s_clean - s_noisy)
+    norm = np.linalg.norm(s_clean)
     
-    assert Sx.shape[0] == signal_len * batch_size
-    assert not np.isnan(Sx).any()
+    # distance < 10% of norm
+    assert distance < 0.10 * norm

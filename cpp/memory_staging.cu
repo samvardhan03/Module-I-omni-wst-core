@@ -1,82 +1,54 @@
 #include "memory_staging.cuh"
-#include <iostream>
 #include <stdexcept>
-#include <utility>
 
-MemoryStaging::MemoryStaging(int signal_len, int batch_size, int q) 
-    : signal_len_(signal_len), batch_size_(batch_size) {
-    
-    // At CD-quality (44.1kHz) with Q >= 16, cache consumes 512 MB.
-    size_t host_bytes = signal_len * batch_size * sizeof(float);
-    
-    // Pinned memory for PCIe bypass
-    if (cudaMallocHost(&h_input_, host_bytes) != cudaSuccess) {
-        throw std::runtime_error("cudaMallocHost failed for h_input_");
-    }
-    
-    if (cudaMallocHost(&h_output_, host_bytes) != cudaSuccess) {
-        cudaFreeHost(h_input_);
-        throw std::runtime_error("cudaMallocHost failed for h_output_");
-    }
-
-    // Device memory double buffering
-    cudaMalloc(&d_input_, host_bytes);
-    cudaMalloc(&d_input_b_, host_bytes);
-    cudaMalloc(&d_output_, host_bytes);
-    
-    // Create streams for dual-stream double buffering
-    cudaStreamCreate(&stream0_); // WST/JTFS forward pass
-    cudaStreamCreate(&stream1_); // Pipeline next batch memcpy
-}
+MemoryStaging::MemoryStaging() : h_buffer(nullptr), d_buffer(nullptr), allocated_bytes(0) {}
 
 MemoryStaging::~MemoryStaging() {
-    cudaFreeHost(h_input_);
-    cudaFreeHost(h_output_);
-    cudaFree(d_input_);
-    cudaFree(d_input_b_);
-    cudaFree(d_output_);
-    cudaStreamDestroy(stream0_);
-    cudaStreamDestroy(stream1_);
+    free_pinned();
 }
 
-void MemoryStaging::load_input(const float* data) {
-    size_t host_bytes = signal_len_ * batch_size_ * sizeof(float);
-    memcpy(h_input_, data, host_bytes);
-}
-
-void MemoryStaging::transfer_to_device_async() {
-    size_t bytes = signal_len_ * batch_size_ * sizeof(float);
-    // Copy to device buffer b via stream 1 while stream 0 computes
-    cudaMemcpyAsync(d_input_b_, h_input_, bytes, cudaMemcpyHostToDevice, stream1_);
+void MemoryStaging::allocate_pinned(size_t bytes) {
+    if (allocated_bytes > 0) {
+        free_pinned();
+    }
     
-    // Wait and swap
-    cudaStreamSynchronize(stream1_);
-    std::swap(d_input_, d_input_b_);
+    cudaError_t err1 = cudaMallocHost(&h_buffer, bytes);
+    if (err1 != cudaSuccess) {
+        throw std::runtime_error("Failed to allocate pinned memory (cudaMallocHost)");
+    }
+    
+    cudaError_t err2 = cudaMalloc(&d_buffer, bytes);
+    if (err2 != cudaSuccess) {
+        cudaFreeHost(h_buffer);
+        h_buffer = nullptr;
+        throw std::runtime_error("Failed to allocate device memory (cudaMalloc)");
+    }
+    
+    allocated_bytes = bytes;
 }
 
-void MemoryStaging::transfer_to_host_async() {
-    size_t bytes = signal_len_ * batch_size_ * sizeof(float);
-    cudaMemcpyAsync(h_output_, d_output_, bytes, cudaMemcpyDeviceToHost, stream0_);
-    cudaStreamSynchronize(stream0_);
+void MemoryStaging::free_pinned() {
+    if (h_buffer) {
+        cudaFreeHost(h_buffer);
+        h_buffer = nullptr;
+    }
+    if (d_buffer) {
+        cudaFree(d_buffer);
+        d_buffer = nullptr;
+    }
+    allocated_bytes = 0;
 }
 
-uint64_t MemoryStaging::get_output_uva_handle() const {
-    // Return CUdeviceptr representation (64-bit handle)
-    return static_cast<uint64_t>(reinterpret_cast<uintptr_t>(d_output_));
+void MemoryStaging::async_h2d(cudaStream_t stream) {
+    if (allocated_bytes == 0) return;
+    cudaMemcpyAsync(d_buffer, h_buffer, allocated_bytes, cudaMemcpyHostToDevice, stream);
 }
 
-float* MemoryStaging::get_host_output() const {
-    return h_output_;
+void MemoryStaging::async_d2h(cudaStream_t stream) {
+    if (allocated_bytes == 0) return;
+    cudaMemcpyAsync(h_buffer, d_buffer, allocated_bytes, cudaMemcpyDeviceToHost, stream);
 }
 
-float* MemoryStaging::get_device_input() const {
-    return d_input_;
-}
-
-float* MemoryStaging::get_device_output() const {
-    return d_output_;
-}
-
-cudaStream_t MemoryStaging::get_compute_stream() const {
-    return stream0_;
+uint64_t MemoryStaging::get_uva_handle() const {
+    return static_cast<uint64_t>(reinterpret_cast<uintptr_t>(d_buffer));
 }
