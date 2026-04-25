@@ -18,6 +18,9 @@ set(SOURCES
   cpp/memory_staging.cu
 )
 
+# Compile bindings as CUDA since they instantiate CUDA templates
+set_source_files_properties(cpp/wst_bindings.cpp PROPERTIES LANGUAGE CUDA)
+
 pybind11_add_module(_core MODULE ${SOURCES})
 
 target_include_directories(_core PRIVATE cpp/)
