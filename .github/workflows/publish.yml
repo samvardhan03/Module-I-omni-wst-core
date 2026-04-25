@@ -49,10 +49,15 @@ jobs:
         env:
           CUDACXX: /usr/local/cuda/bin/nvcc
           
+      - name: Repair wheel for PyPI (manylinux)
+        run: |
+          python3 -m pip install auditwheel
+          auditwheel repair dist/*.whl --plat manylinux_2_35_x86_64 -w dist_repaired/
+          
       - uses: actions/upload-artifact@v4
         with:
           name: cibw-wheels-ubuntu-latest
-          path: dist/*.whl
+          path: dist_repaired/*.whl
 
   publish_pypi:
     name: Publish to PyPI
