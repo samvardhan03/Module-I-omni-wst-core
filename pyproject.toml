@@ -4,7 +4,7 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "omni-wst-core"
-version = "1.0.2"
+version = "1.0.3"
 description = "OmniPulse WST/JTFS C++/CUDA perceptual hashing engine"
 readme = "README.md"
 requires-python = ">=3.10"

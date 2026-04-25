@@ -156,4 +156,8 @@ pytest tests/
 The mathematical primitives within `omni-wst-core` are licensed under the **Apache License 2.0** for free open-source academic and research usage.
 
 **Commercial Deployment:** Production deployment of OmniPulse modules for differential licensing or enterprise MLOps requires an Enterprise SaaS agreement. Academic and government institutions qualify for immediate enterprise waivers. Please refer to `COMMERCIAL_LICENSE.md` or contact the repository owner for details.
+
+---
+*Developed by Samvardhan Singh*
+
 ```
