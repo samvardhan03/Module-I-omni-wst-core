@@ -4,17 +4,37 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>omni-wst-core</title>
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']],
+            },
+            startup: {
+                pageReady: () => {
+                    return MathJax.startup.defaultPageReady().then(() => {
+                        // Bind interactive tooltips after MathJax has finished rendering
+                        bindMathInteractions();
+                    });
+                }
+            }
+        };
+    </script>
     <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" id="MathJax-script" async></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Outfit:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg-color: #0a0f1e;
-            --text-main: #f8fafc;
-            --text-muted: #94a3b8;
-            --accent-blue: #3b82f6;
-            --accent-cyan: #06b6d4;
-            --card-bg: #1e293b;
-            --border-col: #334155;
+            --bg-color: #f8fafc;
+            --text-main: #0f172a;
+            --text-muted: #475569;
+            --accent-indigo: #4f46e5;
+            --accent-teal: #0d9488;
+            --accent-teal-light: #ccfbf1;
+            --accent-indigo-light: #e0e7ff;
+            --card-bg: #ffffff;
+            --border-col: #e2e8f0;
             --font-main: 'Inter', system-ui, -apple-system, sans-serif;
+            --font-display: 'Outfit', system-ui, sans-serif;
             --font-mono: 'JetBrains Mono', 'Courier New', monospace;
         }
 
@@ -28,7 +48,7 @@
             background-color: var(--bg-color);
             color: var(--text-main);
             font-family: var(--font-main);
-            line-height: 1.6;
+            line-height: 1.7;
             scroll-behavior: smooth;
         }
 
@@ -36,7 +56,7 @@
         nav {
             position: sticky;
             top: 0;
-            background: rgba(10, 15, 30, 0.9);
+            background: rgba(255, 255, 255, 0.9);
             backdrop-filter: blur(10px);
             border-bottom: 1px solid var(--border-col);
             padding: 1rem 2rem;
@@ -47,9 +67,11 @@
         }
 
         nav .logo {
-            font-weight: 700;
+            font-family: var(--font-display);
+            font-weight: 800;
             font-size: 1.25rem;
             letter-spacing: -0.02em;
+            color: var(--accent-indigo);
         }
 
         nav ul {
@@ -62,11 +84,12 @@
             color: var(--text-muted);
             text-decoration: none;
             font-size: 0.9rem;
+            font-weight: 500;
             transition: color 0.2s;
         }
 
         nav a:hover {
-            color: var(--accent-cyan);
+            color: var(--accent-indigo);
         }
 
         /* Hero */
@@ -75,6 +98,7 @@
             padding: 8rem 2rem;
             text-align: center;
             overflow: hidden;
+            background: linear-gradient(135deg, #ffffff 0%, #f1f5f9 100%);
             border-bottom: 1px solid var(--border-col);
         }
 
@@ -84,17 +108,24 @@
             left: 0;
             width: 100%;
             height: 100%;
-            z-index: -1;
-            opacity: 0.15;
-            background: radial-gradient(circle at 50% 50%, var(--accent-blue) 0%, transparent 50%);
+            z-index: 0;
+            opacity: 0.4;
+            background: radial-gradient(circle at 50% 50%, var(--accent-indigo-light) 0%, transparent 60%);
+        }
+
+        header > * {
+            position: relative;
+            z-index: 1;
         }
 
         h1 {
-            font-size: 4rem;
+            font-family: var(--font-display);
+            font-size: 4.5rem;
             font-weight: 800;
             letter-spacing: -0.04em;
             margin-bottom: 1rem;
-            background: linear-gradient(to right, var(--accent-cyan), var(--accent-blue));
+            color: var(--text-main);
+            background: linear-gradient(to right, var(--accent-indigo), var(--accent-teal));
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
@@ -104,6 +135,7 @@
             color: var(--text-muted);
             max-width: 600px;
             margin: 0 auto 3rem auto;
+            font-weight: 400;
         }
 
         .cta-container {
@@ -115,118 +147,196 @@
 
         .btn {
             display: inline-block;
-            padding: 0.75rem 1.5rem;
-            border-radius: 6px;
+            padding: 0.85rem 1.75rem;
+            border-radius: 8px;
             font-weight: 600;
             text-decoration: none;
-            transition: all 0.2s;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
             cursor: pointer;
             border: 1px solid transparent;
         }
 
         .btn-primary {
-            background-color: var(--accent-blue);
+            background-color: var(--accent-indigo);
             color: white;
             font-family: var(--font-mono);
             font-size: 0.9rem;
+            box-shadow: 0 4px 6px -1px rgba(79, 70, 229, 0.2), 0 2px 4px -1px rgba(79, 70, 229, 0.1);
         }
 
         .btn-primary:hover {
-            background-color: #2563eb;
+            background-color: #4338ca;
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(79, 70, 229, 0.2), 0 4px 6px -2px rgba(79, 70, 229, 0.1);
         }
 
         .btn-outline {
-            background-color: transparent;
+            background-color: var(--card-bg);
             color: var(--text-main);
             border-color: var(--border-col);
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
         }
 
         .btn-outline:hover {
-            border-color: var(--text-muted);
+            border-color: var(--accent-indigo);
+            color: var(--accent-indigo);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
         }
 
         .toast {
             visibility: hidden;
             min-width: 250px;
-            background-color: var(--accent-cyan);
-            color: #000;
+            background-color: var(--text-main);
+            color: white;
             text-align: center;
-            border-radius: 4px;
+            border-radius: 8px;
             padding: 12px;
             position: fixed;
             z-index: 2000;
             bottom: 30px;
             left: 50%;
-            transform: translateX(-50%);
+            transform: translateX(-50%) translateY(20px);
             font-size: 0.9rem;
-            font-weight: 600;
-            transition: visibility 0s, opacity 0.3s linear;
+            font-weight: 500;
+            transition: visibility 0s, opacity 0.3s, transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
             opacity: 0;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
         }
 
         .toast.show {
             visibility: visible;
             opacity: 1;
+            transform: translateX(-50%) translateY(0);
         }
 
         /* Sections */
         section {
-            padding: 5rem 2rem;
+            padding: 6rem 2rem;
             max-width: 1200px;
             margin: 0 auto;
         }
 
         h2 {
-            font-size: 2rem;
+            font-family: var(--font-display);
+            font-size: 2.25rem;
             margin-bottom: 2.5rem;
-            font-weight: 600;
+            font-weight: 700;
             letter-spacing: -0.02em;
+            color: var(--text-main);
+            position: relative;
+            display: inline-block;
+        }
+        
+        h2::after {
+            content: '';
+            position: absolute;
+            width: 40%;
+            height: 4px;
+            bottom: -10px;
+            left: 0;
+            background: var(--accent-teal);
+            border-radius: 2px;
         }
 
         /* Grid Cards */
         .grid-3 {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
             gap: 2rem;
         }
 
         .card {
             background-color: var(--card-bg);
             border: 1px solid var(--border-col);
-            border-radius: 8px;
-            padding: 2rem;
-            transition: transform 0.2s, border-color 0.2s;
+            border-radius: 12px;
+            padding: 2.5rem;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
         }
 
         .card:hover {
-            transform: translateY(-2px);
-            border-color: var(--accent-blue);
+            transform: translateY(-4px);
+            border-color: var(--accent-indigo);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
         }
 
         .card h3 {
-            font-size: 1.25rem;
+            font-family: var(--font-display);
+            font-size: 1.35rem;
             margin-bottom: 1rem;
-            color: var(--accent-cyan);
+            color: var(--accent-indigo);
+            font-weight: 600;
         }
 
         .card p {
             color: var(--text-muted);
-            font-size: 0.95rem;
+            font-size: 1rem;
+            line-height: 1.6;
         }
 
         /* Mathematics */
+        .math-container {
+            position: relative;
+        }
+        
         .math-block {
             background-color: var(--card-bg);
-            padding: 1.5rem;
-            border-radius: 8px;
+            padding: 2rem;
+            border-radius: 12px;
             border: 1px solid var(--border-col);
             margin: 1.5rem 0;
             overflow-x: auto;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+            position: relative;
+            cursor: default;
+        }
+        
+        .math-block:hover {
+            border-color: var(--accent-teal);
+            box-shadow: 0 10px 15px -3px rgba(13, 148, 136, 0.1);
+            transform: scale(1.01);
         }
         
         .math-prose {
-            color: var(--text-muted);
+            color: var(--text-main);
             margin-bottom: 0.5rem;
+            font-size: 1.05rem;
+        }
+        
+        /* Interactive Math Tooltip */
+        .math-tooltip {
+            position: absolute;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(8px);
+            border: 1px solid var(--accent-teal);
+            border-radius: 6px;
+            padding: 0.75rem 1rem;
+            font-size: 0.9rem;
+            color: var(--text-main);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.2s, transform 0.2s;
+            transform: translateY(10px);
+            z-index: 100;
+            max-width: 250px;
+            font-weight: 500;
+        }
+        
+        .math-tooltip.active {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        
+        .interactive-math {
+            transition: color 0.2s;
+            cursor: pointer;
+        }
+        
+        .interactive-math:hover {
+            color: var(--accent-teal);
         }
 
         /* Architecture Diagram */
@@ -234,77 +344,116 @@
             width: 100%;
             background-color: var(--card-bg);
             border: 1px solid var(--border-col);
-            border-radius: 8px;
+            border-radius: 12px;
             padding: 3rem;
             text-align: center;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
         }
 
         .arch-caption {
             text-align: center;
             color: var(--text-muted);
-            font-size: 0.9rem;
-            margin-top: 1rem;
+            font-size: 0.95rem;
+            margin-top: 1.5rem;
+            font-weight: 500;
         }
 
         /* Use Cases */
         .grid-2 {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
-            gap: 2rem;
+            gap: 2.5rem;
         }
         
         .use-case-item {
             display: flex;
             align-items: flex-start;
-            gap: 1rem;
+            gap: 1.5rem;
             background: var(--card-bg);
-            padding: 1.5rem;
-            border-radius: 8px;
+            padding: 2rem;
+            border-radius: 12px;
             border: 1px solid var(--border-col);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+            transition: transform 0.2s;
+        }
+        
+        .use-case-item:hover {
+            transform: translateY(-2px);
+            border-color: var(--accent-indigo);
         }
         
         .use-case-icon {
             flex-shrink: 0;
             width: 48px;
             height: 48px;
-            fill: var(--accent-cyan);
+            fill: var(--accent-teal);
+            background: var(--accent-teal-light);
+            padding: 10px;
+            border-radius: 12px;
         }
 
         .use-case-content h4 {
-            font-size: 1.1rem;
+            font-family: var(--font-display);
+            font-size: 1.25rem;
             margin-bottom: 0.5rem;
+            color: var(--text-main);
+            font-weight: 600;
         }
 
         .use-case-content p {
             color: var(--text-muted);
-            font-size: 0.9rem;
+            font-size: 0.95rem;
         }
 
         /* Code Block */
         pre {
-            background-color: #0d1117;
-            border: 1px solid var(--border-col);
-            border-radius: 8px;
+            background-color: #1e293b;
+            border-radius: 12px;
             padding: 1.5rem;
             overflow-x: auto;
             font-family: var(--font-mono);
-            font-size: 0.9rem;
+            font-size: 0.95rem;
             line-height: 1.5;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        
+        code {
+            color: #f8fafc;
         }
 
-        .kw { color: #ff7b72; }
-        .func { color: #d2a8ff; }
-        .str { color: #a5d6ff; }
-        .num { color: #79c0ff; }
-        .comment { color: #8b949e; font-style: italic; }
+        .kw { color: #818cf8; }
+        .func { color: #38bdf8; }
+        .str { color: #a7f3d0; }
+        .num { color: #f472b6; }
+        .comment { color: #94a3b8; font-style: italic; }
 
         /* Pricing */
         .price-note {
             text-align: center;
             color: var(--text-muted);
-            font-size: 0.85rem;
-            margin-top: 2rem;
+            font-size: 0.9rem;
+            margin-top: 2.5rem;
             font-style: italic;
+        }
+
+        .price-card {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+        
+        .price-amount {
+            font-family: var(--font-display);
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--text-main);
+            margin-bottom: 0.5rem;
+        }
+        
+        .price-amount span {
+            font-size: 1rem;
+            color: var(--text-muted);
+            font-weight: 400;
         }
 
         /* Footer */
@@ -312,17 +461,19 @@
             text-align: center;
             padding: 3rem;
             border-top: 1px solid var(--border-col);
+            background-color: #ffffff;
             color: var(--text-muted);
-            font-size: 0.9rem;
+            font-size: 0.95rem;
         }
 
         footer a {
-            color: var(--accent-cyan);
+            color: var(--accent-indigo);
             text-decoration: none;
+            font-weight: 500;
         }
         
         @media (max-width: 768px) {
-            h1 { font-size: 2.5rem; }
+            h1 { font-size: 3rem; }
             .grid-2, .grid-3 { grid-template-columns: 1fr; }
             nav ul { display: none; }
         }
@@ -337,26 +488,17 @@
             <li><a href="#math">Mathematics</a></li>
             <li><a href="#architecture">Architecture</a></li>
             <li><a href="#use-cases">Use Cases</a></li>
-            <li><a href="#pricing">Pricing</a></li>
+            <li><a href="#pricing">Deploy</a></li>
         </ul>
     </nav>
 
     <header>
-        <div class="hero-bg">
-            <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
-                <defs>
-                    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
-                        <path d="M 40 0 L 0 0 0 40" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="1"/>
-                    </pattern>
-                </defs>
-                <rect width="100%" height="100%" fill="url(#grid)" />
-            </svg>
-        </div>
+        <div class="hero-bg"></div>
         <h1>omni-wst-core</h1>
         <p class="hero-sub">GPU-accelerated Joint Time-Frequency Scattering Transform. Formally grounded perceptual fingerprinting at industrial throughput.</p>
         <div class="cta-container">
             <button class="btn btn-primary" onclick="copyInstallCmd()">pip install omni-wst-core</button>
-            <a href="https://github.com/samvardhan03/Module-I-omni-wst-core" class="btn btn-outline" target="_blank">→ View on GitHub</a>
+            <a href="https://github.com/samvardhan03/Module-I-omni-wst-core" class="btn btn-outline" target="_blank">View on GitHub</a>
         </div>
     </header>
     
@@ -371,35 +513,38 @@
             </div>
             <div class="card">
                 <h3>Formally Bounded</h3>
-                <p>The depth-m scattering cascade is proven Lipschitz continuous with constant Lₘ ≤ (‖ψ‖₁)ᵐ, exponentially decaying with depth. Minor signal perturbations cannot catastrophically alter fingerprints.</p>
+                <p>The depth-$m$ scattering cascade is proven Lipschitz continuous with constant $L_m \le (||\psi||_1)^m$, exponentially decaying with depth. Minor signal perturbations cannot catastrophically alter fingerprints.</p>
             </div>
             <div class="card">
                 <h3>Zero-Overhead Throughput</h3>
-                <p>Dual-stream CUDA double-buffering hides ≥95% of PCIe transfer latency. Pinned memory allocations sustain >15 GB/s host-to-device bandwidth.</p>
+                <p>Dual-stream CUDA double-buffering hides &ge;95% of PCIe transfer latency. Pinned memory allocations sustain &gt;15 GB/s host-to-device bandwidth.</p>
             </div>
         </div>
     </section>
 
-    <section id="math">
-        <h2>Mathematics</h2>
+    <section id="math" class="math-container">
+        <h2>Interactive Mathematics</h2>
+        <div id="math-tooltip" class="math-tooltip"></div>
+        
         <p class="math-prose">The standard Wavelet Scattering Transform defines a deep convolutional representation through alternating wavelet filtering and pointwise modulus operators:</p>
-        <div class="math-block">
-            \[ S[p]x(u) = | \dots ||x * \psi_{\lambda_1}| * \psi_{\lambda_2}| \dots * \psi_{\lambda_m}| * \phi_J(u) \]
+        
+        <div class="math-block" data-tooltip="Hover over the terms to understand the physics!">
+            \[ S[p]x(u) = \class{interactive-math term-modulus}{|} \dots \class{interactive-math term-modulus}{|}x \class{interactive-math term-conv}{*} \class{interactive-math term-psi}{\psi_{\lambda_1}}\class{interactive-math term-modulus}{|} \class{interactive-math term-conv}{*} \class{interactive-math term-psi}{\psi_{\lambda_2}}\class{interactive-math term-modulus}{|} \dots \class{interactive-math term-conv}{*} \class{interactive-math term-psi}{\psi_{\lambda_m}}\class{interactive-math term-modulus}{|} \class{interactive-math term-conv}{*} \class{interactive-math term-phi}{\phi_J}(u) \]
         </div>
         
         <p class="math-prose">To prevent informational collapse, the analytic filter bank is strictly constrained to form a Parseval frame, satisfying the energy conservation identity:</p>
         <div class="math-block">
-            \[ \sum_{p} \|S[p]x\|^2 = \|x\|^2 \]
+            \[ \sum_{p} \|S[p]x\|^2 = \class{interactive-math term-energy}{\|x\|^2} \]
         </div>
         
         <p class="math-prose">This energy-preserving construction mathematically guarantees deformation stability via the Lipschitz continuity theorem:</p>
         <div class="math-block">
-            \[ \|S[p]x - S[p]y\|_{L^2} \le (\|\psi\|_1)^m \cdot \|x - y\|_{L^2} \]
+            \[ \|S[p]x - S[p]y\|_{L^2} \le (\class{interactive-math term-lipschitz}{\|\psi\|_1})^m \cdot \|x - y\|_{L^2} \]
         </div>
         
         <p class="math-prose">Finally, to recover critical phase-coupling lost during the nonlinear modulus cascade, our Joint Time-Frequency Scattering (JTFS) engine applies a fully separable 2D convolution kernel across both the temporal and log-frequency axes:</p>
         <div class="math-block">
-            \[ \Psi_{\mu,l,s}(t,\lambda) = \psi_\mu(t) \cdot \psi_{l,s}(\lambda) \]
+            \[ \Psi_{\mu,l,s}(\class{interactive-math term-time}{t},\class{interactive-math term-freq}{\lambda}) = \class{interactive-math term-time}{\psi_\mu(t)} \cdot \class{interactive-math term-freq}{\psi_{l,s}(\lambda)} \]
         </div>
     </section>
 
@@ -409,49 +554,49 @@
             <svg width="600" height="300" viewBox="0 0 600 300" xmlns="http://www.w3.org/2000/svg" style="max-width: 100%; height: auto;">
                 <defs>
                     <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" style="stop-color:var(--card-bg);stop-opacity:1" />
-                        <stop offset="100%" style="stop-color:#0f172a;stop-opacity:1" />
+                        <stop offset="0%" style="stop-color:#ffffff;stop-opacity:1" />
+                        <stop offset="100%" style="stop-color:#f1f5f9;stop-opacity:1" />
                     </linearGradient>
                 </defs>
                 
                 <!-- Python Layer -->
-                <rect x="50" y="50" width="120" height="200" rx="4" fill="url(#grad1)" stroke="var(--border-col)" stroke-width="2"/>
-                <text x="110" y="80" fill="var(--text-main)" font-size="14" font-weight="bold" text-anchor="middle">Python</text>
-                <text x="110" y="110" fill="var(--text-muted)" font-size="12" text-anchor="middle">pybind11 Buffer</text>
-                <text x="110" y="130" fill="var(--text-muted)" font-size="12" text-anchor="middle">NumPy Arrays</text>
+                <rect x="50" y="50" width="120" height="200" rx="8" fill="url(#grad1)" stroke="var(--border-col)" stroke-width="2" style="box-shadow: 0 4px 6px rgba(0,0,0,0.1);"/>
+                <text x="110" y="80" fill="var(--text-main)" font-family="var(--font-display)" font-size="16" font-weight="bold" text-anchor="middle">Python</text>
+                <text x="110" y="110" fill="var(--text-muted)" font-family="var(--font-mono)" font-size="12" text-anchor="middle">pybind11</text>
+                <text x="110" y="130" fill="var(--text-muted)" font-family="var(--font-mono)" font-size="12" text-anchor="middle">NumPy Array</text>
                 
                 <!-- C++ Layer -->
-                <rect x="240" y="50" width="120" height="200" rx="4" fill="url(#grad1)" stroke="var(--accent-blue)" stroke-width="2"/>
-                <text x="300" y="80" fill="var(--text-main)" font-size="14" font-weight="bold" text-anchor="middle">C++ Template</text>
-                <text x="300" y="110" fill="var(--accent-cyan)" font-size="12" text-anchor="middle">WSTEngine</text>
-                <text x="300" y="130" fill="var(--accent-cyan)" font-size="12" text-anchor="middle">JTFSEngine</text>
-                <text x="300" y="150" fill="var(--text-muted)" font-size="12" text-anchor="middle">TilePolicy Meta</text>
+                <rect x="240" y="50" width="120" height="200" rx="8" fill="url(#grad1)" stroke="var(--accent-indigo)" stroke-width="3"/>
+                <text x="300" y="80" fill="var(--text-main)" font-family="var(--font-display)" font-size="16" font-weight="bold" text-anchor="middle">C++ Template</text>
+                <text x="300" y="110" fill="var(--accent-indigo)" font-family="var(--font-mono)" font-size="12" font-weight="bold" text-anchor="middle">WSTEngine</text>
+                <text x="300" y="130" fill="var(--accent-indigo)" font-family="var(--font-mono)" font-size="12" font-weight="bold" text-anchor="middle">JTFSEngine</text>
+                <text x="300" y="150" fill="var(--text-muted)" font-family="var(--font-mono)" font-size="12" text-anchor="middle">TilePolicy</text>
                 
                 <!-- CUDA Layer -->
-                <rect x="430" y="50" width="120" height="200" rx="4" fill="url(#grad1)" stroke="var(--accent-cyan)" stroke-width="2"/>
-                <text x="490" y="80" fill="var(--text-main)" font-size="14" font-weight="bold" text-anchor="middle">CUDA GPU</text>
-                <text x="490" y="110" fill="var(--text-muted)" font-size="12" text-anchor="middle">cuFFT Batched</text>
-                <text x="490" y="130" fill="var(--text-muted)" font-size="12" text-anchor="middle">Dual-Stream</text>
-                <text x="490" y="150" fill="var(--text-muted)" font-size="12" text-anchor="middle">Pinned Memory</text>
+                <rect x="430" y="50" width="120" height="200" rx="8" fill="url(#grad1)" stroke="var(--accent-teal)" stroke-width="3"/>
+                <text x="490" y="80" fill="var(--text-main)" font-family="var(--font-display)" font-size="16" font-weight="bold" text-anchor="middle">CUDA GPU</text>
+                <text x="490" y="110" fill="var(--accent-teal)" font-family="var(--font-mono)" font-size="12" font-weight="bold" text-anchor="middle">cuFFT Batched</text>
+                <text x="490" y="130" fill="var(--accent-teal)" font-family="var(--font-mono)" font-size="12" font-weight="bold" text-anchor="middle">Dual-Stream</text>
+                <text x="490" y="150" fill="var(--text-muted)" font-family="var(--font-mono)" font-size="12" text-anchor="middle">Pinned Memory</text>
 
                 <!-- Arrows -->
                 <path d="M 170 120 L 230 120" stroke="var(--text-muted)" stroke-width="2" marker-end="url(#arrow)" fill="none"/>
                 <path d="M 230 180 L 170 180" stroke="var(--text-muted)" stroke-width="2" marker-end="url(#arrow)" fill="none"/>
-                <path d="M 360 120 L 420 120" stroke="var(--accent-blue)" stroke-width="2" marker-end="url(#arrowBlue)" fill="none"/>
-                <path d="M 420 180 L 360 180" stroke="var(--accent-cyan)" stroke-width="2" marker-end="url(#arrowCyan)" fill="none"/>
+                <path d="M 360 120 L 420 120" stroke="var(--accent-indigo)" stroke-width="2" marker-end="url(#arrowBlue)" fill="none"/>
+                <path d="M 420 180 L 360 180" stroke="var(--accent-teal)" stroke-width="2" marker-end="url(#arrowCyan)" fill="none"/>
 
                 <marker id="arrow" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
                     <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--text-muted)" />
                 </marker>
                 <marker id="arrowBlue" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-                    <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--accent-blue)" />
+                    <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--accent-indigo)" />
                 </marker>
                 <marker id="arrowCyan" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-                    <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--accent-cyan)" />
+                    <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--accent-teal)" />
                 </marker>
             </svg>
         </div>
-        <p class="arch-caption">Zero-copy pipeline from Python NumPy → GPU VRAM. No intermediate heap allocations after initialisation.</p>
+        <p class="arch-caption">Zero-copy pipeline from Python NumPy &rarr; GPU VRAM. No intermediate heap allocations after initialization.</p>
     </section>
 
     <section id="use-cases">
@@ -461,7 +606,7 @@
                 <svg class="use-case-icon" viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
                 <div class="use-case-content">
                     <h4>Perceptual Media Fingerprinting</h4>
-                    <p>Detect near-duplicate audio and robust copyright violations by extracting JTFS signatures that remain invariant to MP3 compression, equalisation, and adversarial time-stretching.</p>
+                    <p>Detect near-duplicate audio and robust copyright violations by extracting JTFS signatures that remain invariant to MP3 compression, equalization, and adversarial time-stretching.</p>
                 </div>
             </div>
             
@@ -502,7 +647,7 @@ cfg = wst.WSTConfig(J=<span class="num">8</span>, Q=<span class="num">16</span>,
 <span class="comment"># 44.1kHz audio frame mock</span>
 signal = np.random.randn(<span class="num">44100</span>).astype(np.float32)
 
-<span class="comment"># Forward pass</span>
+<span class="comment"># Forward pass executing dual-stream CUDA kernels</span>
 fingerprint = wst.fingerprint(signal, cfg)
 
 <span class="func">print</span>(<span class="str">f"Fingerprint shape: {fingerprint.shape}"</span>)
@@ -510,33 +655,39 @@ fingerprint = wst.fingerprint(signal, cfg)
     </section>
 
     <section id="pricing">
-        <h2>Pricing & Deployment</h2>
+        <h2>Deployment Rights</h2>
         <div class="grid-3">
-            <div class="card" style="border-top: 3px solid var(--text-muted)">
-                <h3>Research (Free)</h3>
-                <h4 style="margin-bottom: 1rem; color: #fff;">$0 <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: 400;">/ forever</span></h4>
-                <p style="margin-bottom: 1.5rem;">WST + JTFS<br>CPU & GPU targets<br>Apache 2.0 License<br>Unlimited academic use</p>
-                <a href="#hero" class="btn btn-outline" style="width: 100%; text-align: center;">Install Now</a>
+            <div class="card price-card" style="border-top: 4px solid var(--border-col)">
+                <div>
+                    <h3>Research (Free)</h3>
+                    <div class="price-amount">$0 <span>/ forever</span></div>
+                    <p style="margin: 1.5rem 0;">WST + JTFS<br>CPU & GPU targets<br>Apache 2.0 License<br>Unlimited academic use</p>
+                </div>
+                <a href="#hero" class="btn btn-outline" style="width: 100%; text-align: center;">Install via PyPI</a>
             </div>
-            <div class="card" style="border-top: 3px solid var(--accent-blue)">
-                <h3>Commercial License</h3>
-                <h4 style="margin-bottom: 1rem; color: #fff;">Custom Pricing</h4>
-                <p style="margin-bottom: 1.5rem;">Production deployment rights<br>Priority developer support<br>Strict SLA options<br>Custom CUDA hardware targets</p>
-                <a href="mailto:licensing@omnipulse.io?subject=omni-wst-core Commercial License Request" class="btn btn-primary" style="width: 100%; text-align: center;">Request Quote →</a>
+            <div class="card price-card" style="border-top: 4px solid var(--accent-indigo)">
+                <div>
+                    <h3>Commercial License</h3>
+                    <div class="price-amount">Custom</div>
+                    <p style="margin: 1.5rem 0;">Production deployment rights<br>Priority developer support<br>Strict SLA options<br>Custom CUDA hardware targets</p>
+                </div>
+                <a href="mailto:licensing@omnipulse.io?subject=omni-wst-core Commercial License Request" class="btn btn-primary" style="width: 100%; text-align: center;">Request Quote &rarr;</a>
             </div>
-            <div class="card" style="border-top: 3px solid var(--accent-cyan)">
-                <h3>Enterprise</h3>
-                <h4 style="margin-bottom: 1rem; color: #fff;">Contact Us</h4>
-                <p style="margin-bottom: 1.5rem;">Full SaaS integration<br>Rust orchestration layer<br>Ed25519 licensing pipeline<br>Dedicated Kubernetes namespace</p>
-                <a href="mailto:licensing@omnipulse.io?subject=omni-wst-core Enterprise Request" class="btn btn-outline" style="width: 100%; text-align: center; border-color: var(--accent-cyan); color: var(--accent-cyan);">Contact Sales →</a>
+            <div class="card price-card" style="border-top: 4px solid var(--accent-teal)">
+                <div>
+                    <h3>Enterprise SaaS</h3>
+                    <div class="price-amount">Contact</div>
+                    <p style="margin: 1.5rem 0;">Full SaaS integration<br>Rust orchestration layer<br>Ed25519 licensing pipeline<br>Dedicated Kubernetes namespace</p>
+                </div>
+                <a href="mailto:licensing@omnipulse.io?subject=omni-wst-core Enterprise Request" class="btn btn-outline" style="width: 100%; text-align: center; border-color: var(--accent-teal); color: var(--accent-teal);">Contact Sales &rarr;</a>
             </div>
         </div>
         <p class="price-note">Academic and government research institutions qualify for free commercial waivers — include institutional affiliation in your request.</p>
     </section>
 
     <footer>
-        <p>omni-wst-core — OmniPulse Platform // Apache 2.0 for research use // &copy; 2025</p>
-        <p style="margin-top: 0.5rem; font-size: 0.8rem;">Developed by Samvardhan Singh · <a href="https://github.com/samvardhan03/Module-I-omni-wst-core" target="_blank">GitHub</a></p>
+        <p>omni-wst-core — OmniPulse Platform // Apache 2.0 for research use // &copy; 2026</p>
+        <p style="margin-top: 0.5rem; font-size: 0.85rem; font-weight: 500;">Developed by Samvardhan Singh &middot; <a href="https://github.com/samvardhan03/Module-I-omni-wst-core" target="_blank">GitHub</a></p>
     </footer>
 
     <script>
@@ -545,6 +696,47 @@ fingerprint = wst.fingerprint(signal, cfg)
                 const toast = document.getElementById("toast");
                 toast.className = "toast show";
                 setTimeout(function(){ toast.className = toast.className.replace("show", ""); }, 3000);
+            });
+        }
+
+        // Interactive Math Tooltip Logic
+        const tooltips = {
+            'term-modulus': 'The Complex Modulus nonlinearity |·| discards the rapidly varying phase, creating a translation-invariant representation.',
+            'term-conv': 'Convolution operator executed efficiently in the Fourier domain via batched cuFFT.',
+            'term-psi': 'Analytic Morlet Wavelet filter bank responsible for extracting multi-scale frequency bands.',
+            'term-phi': 'Low-pass scaling function that averages the signal over the spatial window 2^J.',
+            'term-energy': 'Because the filter bank forms a Parseval frame, 100% of the input signal energy is conserved across the scattering paths.',
+            'term-lipschitz': 'The L1 norm of the wavelet is strictly less than 1, ensuring exponential decay of the Lipschitz constant bounds.',
+            'term-time': 'Temporal convolution kernel analyzing standard amplitude modulations over time.',
+            'term-freq': 'Log-frequency convolution kernel analyzing structural relationships across different frequency bands simultaneously.'
+        };
+
+        function bindMathInteractions() {
+            const tooltipEl = document.getElementById('math-tooltip');
+            
+            // MathJax renders elements with specific classes if we use \class{}{} in the TeX string.
+            // We find all those spans.
+            const interactiveTerms = document.querySelectorAll('.interactive-math');
+            
+            interactiveTerms.forEach(term => {
+                term.addEventListener('mouseenter', (e) => {
+                    // Extract the specific term class
+                    const termClass = Array.from(term.classList).find(c => c.startsWith('term-'));
+                    if (termClass && tooltips[termClass]) {
+                        tooltipEl.innerText = tooltips[termClass];
+                        tooltipEl.classList.add('active');
+                        
+                        // Position tooltip near the element
+                        const rect = term.getBoundingClientRect();
+                        // Adjust position based on scroll and element position
+                        tooltipEl.style.left = (rect.left + (rect.width / 2) - 125) + 'px';
+                        tooltipEl.style.top = (window.scrollY + rect.bottom + 15) + 'px';
+                    }
+                });
+                
+                term.addEventListener('mouseleave', () => {
+                    tooltipEl.classList.remove('active');
+                });
             });
         }
     </script>
