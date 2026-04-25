@@ -4,4 +4,4 @@ except ImportError as e:
     raise ImportError(f"omni_wst_core C++ extension not built. Run: pip install -e . — {e}")
 
 __all__ = ["WSTConfig", "JTFSConfig", "fingerprint", "scattering_paths", "cuda_available"]
-__version__ = "1.0.0"
+__version__ = "1.0.1"
