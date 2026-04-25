@@ -39,7 +39,7 @@ jobs:
       - name: Install OS dependencies and Python
         run: |
           apt-get update
-          apt-get install -y python3-pip python3-venv git
+          apt-get install -y python3-pip python3-venv git patchelf
           
       - name: Install build tools
         run: python3 -m pip install build setuptools wheel scikit-build-core pybind11 cmake ninja
