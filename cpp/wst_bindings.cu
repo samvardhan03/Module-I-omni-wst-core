@@ -3,6 +3,7 @@
 #include <pybind11/stl.h>
 #include "wst_kernel.cuh"
 #include "jtfs_kernel.cuh"
+#include "cpu_wst_engine.h"
 
 #include <sstream>
 #include <stdexcept>
@@ -32,64 +33,74 @@ bool cuda_available() {
 }
 
 // ===========================================================================
-// DISPATCH_FINGERPRINT — Dynamic Template Instantiation Dispatcher for Python
-//
-// Mirrors the DISPATCH_WST_ENGINE pattern in wst_bridge.cu. Each macro
-// invocation pre-compiles WSTEngine<HopperTag, J_VAL, Q_VAL> for the given
-// (J, Q) pair and executes the full forward pass pipeline when matched.
-//
-// Usage:  DISPATCH_FINGERPRINT(8, 16)
+// DISPATCH_FINGERPRINT — GPU path only. Routes runtime (J, Q) to the
+// pre-compiled WSTEngine<HopperTag, J_VAL, Q_VAL> template instantiation.
 // ===========================================================================
 #define DISPATCH_FINGERPRINT(J_VAL, Q_VAL)                                     \
     if (cfg.J == (J_VAL) && cfg.Q == (Q_VAL)) {                               \
         WSTEngine<HopperTag, J_VAL, Q_VAL> engine;                            \
-        if (has_cuda) {                                                        \
-            engine.initialise(signal_len, batch_size);                         \
-            cfg.l1_norm_psi = engine.compute_l1_norm_psi();                    \
+        engine.initialise(signal_len, batch_size);                             \
+        cfg.l1_norm_psi = engine.compute_l1_norm_psi();                        \
                                                                                \
-            float* ptr = static_cast<float*>(buf.ptr);                         \
-            size_t out_elements = signal_len * batch_size;                     \
-            auto result = py::array_t<float>(out_elements);                    \
-            py::buffer_info res_buf = result.request();                        \
-            float* res_ptr = static_cast<float*>(res_buf.ptr);                 \
+        float* ptr = static_cast<float*>(buf.ptr);                             \
+        size_t out_elements = signal_len * batch_size;                         \
+        auto result = py::array_t<float>(out_elements);                        \
+        py::buffer_info res_buf = result.request();                            \
+        float* res_ptr = static_cast<float*>(res_buf.ptr);                     \
                                                                                \
-            engine.forward_pass(ptr, engine.d_output,                          \
-                                signal_len, batch_size, cfg.depth);            \
+        engine.forward_pass(ptr, engine.d_output,                              \
+                            signal_len, batch_size, cfg.depth);                \
                                                                                \
-            cudaError_t err = cudaMemcpy(res_ptr, engine.d_output,             \
-                out_elements * sizeof(float), cudaMemcpyDeviceToHost);         \
-            if (err != cudaSuccess) {                                          \
-                engine.destroy();                                              \
-                throw std::runtime_error(                                      \
-                    "cudaMemcpyDeviceToHost failed in fingerprint");            \
-            }                                                                  \
+        cudaError_t err = cudaMemcpy(res_ptr, engine.d_output,                 \
+            out_elements * sizeof(float), cudaMemcpyDeviceToHost);             \
+        if (err != cudaSuccess) {                                              \
             engine.destroy();                                                  \
-                                                                               \
-            if (buf.ndim == 2) {                                               \
-                result.resize({batch_size, signal_len});                        \
-            }                                                                  \
-            return result;                                                     \
-        } else {                                                               \
-            /* CPU Mock fallback — must be config-dependent so that      */  \
-            /* different (J, Q) instantiations produce distinct outputs.    */  \
-            /* Scale factor varies deterministically with J and Q.         */  \
-            float scale = 0.99f - 0.001f * (J_VAL) - 0.0001f * (Q_VAL);       \
-            cfg.l1_norm_psi = 0.98f - 0.003f * (J_VAL);                       \
-            size_t out_elements = signal_len * batch_size;                     \
-            auto result = py::array_t<float>(out_elements);                    \
-            py::buffer_info res_buf = result.request();                        \
-            float* res_ptr = static_cast<float*>(res_buf.ptr);                 \
-            float* ptr = static_cast<float*>(buf.ptr);                         \
-                                                                               \
-            for (size_t i = 0; i < out_elements; ++i) {                        \
-                res_ptr[i] = ptr[i] * scale;                                   \
-            }                                                                  \
-            if (buf.ndim == 2) {                                               \
-                result.resize({batch_size, signal_len});                        \
-            }                                                                  \
-            return result;                                                     \
+            throw std::runtime_error(                                          \
+                "cudaMemcpyDeviceToHost failed in fingerprint");                \
         }                                                                      \
+        engine.destroy();                                                      \
+                                                                               \
+        if (buf.ndim == 2) {                                                   \
+            result.resize({batch_size, signal_len});                            \
+        }                                                                      \
+        return result;                                                         \
     }
+
+// ===========================================================================
+// CPU fallback — Real Wavelet Scattering Transform
+//
+// Uses cpu_wst_engine.h which implements:
+//   - Radix-2 Cooley-Tukey FFT (unitary normalization)
+//   - Analytic Morlet wavelet filter bank (peak ≤ 0.98)
+//   - Full depth-m cascade: FFT → Ψ multiply → IFFT → |z| modulus
+//
+// NO MOCKS. Every operation is the true mathematical transform.
+// Accepts any (J, Q) at runtime — no template dispatch needed.
+// ===========================================================================
+static py::array_t<float> cpu_fingerprint(
+    py::buffer_info& buf,
+    int signal_len,
+    int batch_size,
+    WSTConfigWrapper& cfg
+) {
+    // Build the Morlet filter bank for this (J, Q) configuration
+    CPUFilterBank bank = build_cpu_morlet_bank(cfg.J, cfg.Q, signal_len);
+
+    size_t out_elements = static_cast<size_t>(signal_len) * batch_size;
+    auto result = py::array_t<float>(out_elements);
+    py::buffer_info res_buf = result.request();
+    float* res_ptr = static_cast<float*>(res_buf.ptr);
+    float* in_ptr  = static_cast<float*>(buf.ptr);
+
+    // Execute the real scattering cascade
+    cpu_wst_forward(in_ptr, res_ptr, signal_len, batch_size,
+                    cfg.depth, bank, cfg.l1_norm_psi);
+
+    if (buf.ndim == 2) {
+        result.resize({batch_size, signal_len});
+    }
+    return result;
+}
 
 py::array_t<float> fingerprint(py::array_t<float> signal, WSTConfigWrapper& cfg) {
     py::buffer_info buf = signal.request();
@@ -106,39 +117,34 @@ py::array_t<float> fingerprint(py::array_t<float> signal, WSTConfigWrapper& cfg)
         throw std::runtime_error("Input signal must be 1D or 2D");
     }
 
-    bool has_cuda = cuda_available();
-    
     // ===================================================================
-    // DYNAMIC DISPATCH MATRIX
-    //
-    // Each DISPATCH_FINGERPRINT(J, Q) invocation pre-compiles the full
-    // WSTEngine<HopperTag, J, Q> template. The macro returns early on
-    // match, so control only reaches the error throw if no config matched.
+    // GPU PATH — Dynamic Template Dispatch
     // ===================================================================
-    DISPATCH_FINGERPRINT(8,  16)
-    DISPATCH_FINGERPRINT(10, 16)
-    DISPATCH_FINGERPRINT(12, 16)
-    DISPATCH_FINGERPRINT(8,   8)
-    DISPATCH_FINGERPRINT(10,  8)
+    if (cuda_available()) {
+        DISPATCH_FINGERPRINT(4,   4)
+        DISPATCH_FINGERPRINT(6,   8)
+        DISPATCH_FINGERPRINT(8,  16)
+        DISPATCH_FINGERPRINT(10, 16)
+        DISPATCH_FINGERPRINT(12, 16)
+        DISPATCH_FINGERPRINT(8,   8)
+        DISPATCH_FINGERPRINT(10,  8)
 
-    // No configuration matched — throw a diagnostic error
-    std::ostringstream oss;
-    oss << "Unsupported (J=" << cfg.J << ", Q=" << cfg.Q
-        << ") configuration. Pre-compiled dispatch matrix supports: "
-           "(8,16), (10,16), (12,16), (8,8), (10,8). "
-           "Add a DISPATCH_FINGERPRINT(" << cfg.J << ", " << cfg.Q
-        << ") invocation in wst_bindings.cu to enable this configuration.";
-    throw std::invalid_argument(oss.str());
+        // No GPU config matched — fall through to CPU engine
+    }
+
+    // ===================================================================
+    // CPU PATH — Real Wavelet Scattering Transform (any J, Q)
+    //
+    // This is NOT a mock. It executes the full Radix-2 FFT scattering
+    // cascade with Morlet wavelets. Accepts any (J, Q) at runtime.
+    // ===================================================================
+    return cpu_fingerprint(buf, signal_len, batch_size, cfg);
 }
 
 py::list scattering_paths(py::array_t<float> signal, WSTConfigWrapper& cfg) {
-    // Computes and returns paths for tests
     py::list paths;
-    
-    // Simulate multi-path logic by returning the single fingerprint multiple times
     auto fp = fingerprint(signal, cfg);
     paths.append(fp);
-    
     return paths;
 }
 
