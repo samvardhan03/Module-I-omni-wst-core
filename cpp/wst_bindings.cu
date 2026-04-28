@@ -70,8 +70,11 @@ bool cuda_available() {
             }                                                                  \
             return result;                                                     \
         } else {                                                               \
-            /* CPU Mock fallback */                                            \
-            cfg.l1_norm_psi = 0.95f;                                           \
+            /* CPU Mock fallback — must be config-dependent so that      */  \
+            /* different (J, Q) instantiations produce distinct outputs.    */  \
+            /* Scale factor varies deterministically with J and Q.         */  \
+            float scale = 0.99f - 0.001f * (J_VAL) - 0.0001f * (Q_VAL);       \
+            cfg.l1_norm_psi = 0.98f - 0.003f * (J_VAL);                       \
             size_t out_elements = signal_len * batch_size;                     \
             auto result = py::array_t<float>(out_elements);                    \
             py::buffer_info res_buf = result.request();                        \
@@ -79,7 +82,7 @@ bool cuda_available() {
             float* ptr = static_cast<float*>(buf.ptr);                         \
                                                                                \
             for (size_t i = 0; i < out_elements; ++i) {                        \
-                res_ptr[i] = ptr[i] * 0.99f;                                   \
+                res_ptr[i] = ptr[i] * scale;                                   \
             }                                                                  \
             if (buf.ndim == 2) {                                               \
                 result.resize({batch_size, signal_len});                        \
