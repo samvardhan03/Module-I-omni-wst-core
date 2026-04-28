@@ -48,6 +48,14 @@ jobs:
         run: python3 -m build --wheel
         env:
           CUDACXX: /usr/local/cuda/bin/nvcc
+
+      - name: Install wheel and test dependencies
+        run: |
+          python3 -m pip install dist/*.whl
+          python3 -m pip install pytest numpy
+
+      - name: Run dispatch validation tests
+        run: python3 -m pytest tests/test_dispatch.py tests/test_wst.py -v --tb=long
           
       - name: Repair wheel for PyPI (manylinux)
         run: |
