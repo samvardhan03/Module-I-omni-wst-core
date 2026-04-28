@@ -185,8 +185,11 @@ static void cpu_wst_forward(
 
         // Scattering cascade
         for (int d = 0; d < depth; ++d) {
-            // Select wavelet (cycle through the bank)
-            int lam = d % bank.n_wavelets;
+            // Select wavelet — evenly sample across the J*Q filter bank.
+            // This ensures different J values probe different scales, since
+            // n_wavelets = J*Q and the stride changes with J.
+            int lam = ((d + 1) * bank.n_wavelets) / (depth + 1);
+            lam = std::min(lam, bank.n_wavelets - 1);
             const auto& psi = bank.filters[lam];
 
             // Step 1: Forward FFT
