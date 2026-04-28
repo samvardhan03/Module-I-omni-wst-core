@@ -4,6 +4,9 @@
 #include "wst_kernel.cuh"
 #include "jtfs_kernel.cuh"
 
+#include <sstream>
+#include <stdexcept>
+
 namespace py = pybind11;
 
 struct WSTConfigWrapper {
@@ -28,6 +31,63 @@ bool cuda_available() {
     return (error_id == cudaSuccess && deviceCount > 0);
 }
 
+// ===========================================================================
+// DISPATCH_FINGERPRINT — Dynamic Template Instantiation Dispatcher for Python
+//
+// Mirrors the DISPATCH_WST_ENGINE pattern in wst_bridge.cu. Each macro
+// invocation pre-compiles WSTEngine<HopperTag, J_VAL, Q_VAL> for the given
+// (J, Q) pair and executes the full forward pass pipeline when matched.
+//
+// Usage:  DISPATCH_FINGERPRINT(8, 16)
+// ===========================================================================
+#define DISPATCH_FINGERPRINT(J_VAL, Q_VAL)                                     \
+    if (cfg.J == (J_VAL) && cfg.Q == (Q_VAL)) {                               \
+        WSTEngine<HopperTag, J_VAL, Q_VAL> engine;                            \
+        if (has_cuda) {                                                        \
+            engine.initialise(signal_len, batch_size);                         \
+            cfg.l1_norm_psi = engine.compute_l1_norm_psi();                    \
+                                                                               \
+            float* ptr = static_cast<float*>(buf.ptr);                         \
+            size_t out_elements = signal_len * batch_size;                     \
+            auto result = py::array_t<float>(out_elements);                    \
+            py::buffer_info res_buf = result.request();                        \
+            float* res_ptr = static_cast<float*>(res_buf.ptr);                 \
+                                                                               \
+            engine.forward_pass(ptr, engine.d_output,                          \
+                                signal_len, batch_size, cfg.depth);            \
+                                                                               \
+            cudaError_t err = cudaMemcpy(res_ptr, engine.d_output,             \
+                out_elements * sizeof(float), cudaMemcpyDeviceToHost);         \
+            if (err != cudaSuccess) {                                          \
+                engine.destroy();                                              \
+                throw std::runtime_error(                                      \
+                    "cudaMemcpyDeviceToHost failed in fingerprint");            \
+            }                                                                  \
+            engine.destroy();                                                  \
+                                                                               \
+            if (buf.ndim == 2) {                                               \
+                result.resize({batch_size, signal_len});                        \
+            }                                                                  \
+            return result;                                                     \
+        } else {                                                               \
+            /* CPU Mock fallback */                                            \
+            cfg.l1_norm_psi = 0.95f;                                           \
+            size_t out_elements = signal_len * batch_size;                     \
+            auto result = py::array_t<float>(out_elements);                    \
+            py::buffer_info res_buf = result.request();                        \
+            float* res_ptr = static_cast<float*>(res_buf.ptr);                 \
+            float* ptr = static_cast<float*>(buf.ptr);                         \
+                                                                               \
+            for (size_t i = 0; i < out_elements; ++i) {                        \
+                res_ptr[i] = ptr[i] * 0.99f;                                   \
+            }                                                                  \
+            if (buf.ndim == 2) {                                               \
+                result.resize({batch_size, signal_len});                        \
+            }                                                                  \
+            return result;                                                     \
+        }                                                                      \
+    }
+
 py::array_t<float> fingerprint(py::array_t<float> signal, WSTConfigWrapper& cfg) {
     py::buffer_info buf = signal.request();
     
@@ -42,53 +102,30 @@ py::array_t<float> fingerprint(py::array_t<float> signal, WSTConfigWrapper& cfg)
     } else {
         throw std::runtime_error("Input signal must be 1D or 2D");
     }
+
+    bool has_cuda = cuda_available();
     
-    WSTEngine<HopperTag, 8, 16> engine; 
-    
-    if (cuda_available()) {
-        engine.initialise(signal_len, batch_size);
-        cfg.l1_norm_psi = engine.compute_l1_norm_psi();
-        
-        float* ptr = static_cast<float*>(buf.ptr);
-        
-        size_t out_elements = signal_len * batch_size;
-        auto result = py::array_t<float>(out_elements);
-        py::buffer_info res_buf = result.request();
-        float* res_ptr = static_cast<float*>(res_buf.ptr);
-        
-        engine.forward_pass(ptr, engine.d_output, signal_len, batch_size, cfg.depth);
-        
-        cudaError_t err = cudaMemcpy(res_ptr, engine.d_output, out_elements * sizeof(float), cudaMemcpyDeviceToHost);
-        if (err != cudaSuccess) {
-            engine.destroy();
-            throw std::runtime_error("cudaMemcpyDeviceToHost failed in fingerprint");
-        }
-        
-        engine.destroy();
-        
-        if (buf.ndim == 2) {
-            result.resize({batch_size, signal_len});
-        }
-        return result;
-    } else {
-        // CPU Mock fallback representation
-        cfg.l1_norm_psi = 0.95f; 
-        size_t out_elements = signal_len * batch_size;
-        auto result = py::array_t<float>(out_elements);
-        py::buffer_info res_buf = result.request();
-        float* res_ptr = static_cast<float*>(res_buf.ptr);
-        float* ptr = static_cast<float*>(buf.ptr);
-        
-        // Just mock some output that is deterministically computed from input
-        for (size_t i = 0; i < out_elements; ++i) {
-            res_ptr[i] = ptr[i] * 0.99f; 
-        }
-        
-        if (buf.ndim == 2) {
-            result.resize({batch_size, signal_len});
-        }
-        return result;
-    }
+    // ===================================================================
+    // DYNAMIC DISPATCH MATRIX
+    //
+    // Each DISPATCH_FINGERPRINT(J, Q) invocation pre-compiles the full
+    // WSTEngine<HopperTag, J, Q> template. The macro returns early on
+    // match, so control only reaches the error throw if no config matched.
+    // ===================================================================
+    DISPATCH_FINGERPRINT(8,  16)
+    DISPATCH_FINGERPRINT(10, 16)
+    DISPATCH_FINGERPRINT(12, 16)
+    DISPATCH_FINGERPRINT(8,   8)
+    DISPATCH_FINGERPRINT(10,  8)
+
+    // No configuration matched — throw a diagnostic error
+    std::ostringstream oss;
+    oss << "Unsupported (J=" << cfg.J << ", Q=" << cfg.Q
+        << ") configuration. Pre-compiled dispatch matrix supports: "
+           "(8,16), (10,16), (12,16), (8,8), (10,8). "
+           "Add a DISPATCH_FINGERPRINT(" << cfg.J << ", " << cfg.Q
+        << ") invocation in wst_bindings.cu to enable this configuration.";
+    throw std::invalid_argument(oss.str());
 }
 
 py::list scattering_paths(py::array_t<float> signal, WSTConfigWrapper& cfg) {

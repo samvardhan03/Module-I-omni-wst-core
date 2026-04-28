@@ -4,6 +4,15 @@
 // so the two distribution targets (PyPI wheel and Rust sys crate) never interfere.
 //
 // TDD Reference: Section 2.1 — Zero-Cost cxx FFI Bridge
+//
+// ARCHITECTURE NOTE — Dynamic Template Instantiation Dispatcher
+// =============================================================
+// C++ templates are resolved at compile time. CUDA kernels parameterised by
+// (J, Q) must be compiled for every configuration the user may request at
+// runtime. We pre-instantiate a fixed dispatch matrix of (J, Q) pairs and
+// route the runtime integers through the DISPATCH_WST_ENGINE macro. Adding a
+// new (J, Q) configuration requires only a one-line macro invocation —
+// no other code changes are necessary.
 
 #include "wst_bridge.h"
 #include "wst_kernel.cuh"
@@ -13,6 +22,8 @@
 #include <cuda_runtime.h>
 #include <chrono>
 #include <stdexcept>
+#include <sstream>
+#include <string>
 
 // ---------------------------------------------------------------------------
 // Internal helper: map a host-side Plasma mmap ptr to a pinned CUDA buffer.
@@ -36,15 +47,72 @@ static void unregister_plasma_buffer(uint64_t plasma_ptr) {
     cudaHostUnregister(host_ptr);
 }
 
+// ===========================================================================
+// DISPATCH_WST_ENGINE — Dynamic Template Instantiation Dispatcher Macro
+//
+// For each pre-compiled (J, Q) pair, this macro:
+//   1. Checks if the runtime `j` and `q` values match (J_VAL, Q_VAL).
+//   2. Branches on `use_jtfs` to instantiate the correct engine class.
+//   3. Executes H2D transfer, forward pass, and builds the WSTResult.
+//   4. Returns immediately on match — no fallthrough to the next case.
+//
+// Usage:  DISPATCH_WST_ENGINE(8, 16)   // pre-compiles (J=8, Q=16) templates
+// ===========================================================================
+#define DISPATCH_WST_ENGINE(J_VAL, Q_VAL)                                      \
+    if (j == (J_VAL) && q == (Q_VAL)) {                                        \
+        if (!use_jtfs) {                                                       \
+            /* Standard WST path */                                            \
+            WSTEngine<HopperTag, J_VAL, Q_VAL> engine;                         \
+            engine.initialise(signal_len, batch_size);                         \
+                                                                               \
+            float* d_input = nullptr;                                          \
+            cudaMalloc(&d_input, input_bytes);                                 \
+            cudaStream_t h2d_stream;                                           \
+            cudaStreamCreate(&h2d_stream);                                     \
+            cudaMemcpyAsync(d_input, h_input, input_bytes,                     \
+                            cudaMemcpyHostToDevice, h2d_stream);               \
+            cudaStreamSynchronize(h2d_stream);                                 \
+            cudaStreamDestroy(h2d_stream);                                     \
+                                                                               \
+            engine.forward_pass(d_input, d_output, signal_len,                 \
+                                batch_size, depth);                            \
+            engine.destroy();                                                  \
+            cudaFree(d_input);                                                 \
+        } else {                                                               \
+            /* JTFS path — separable 2D conv on dual CUDA streams */           \
+            JTFSEngine<HopperTag, J_VAL, Q_VAL, 1> jtfs_engine;               \
+            jtfs_engine.initialise(signal_len, batch_size);                    \
+                                                                               \
+            float* d_input = nullptr;                                          \
+            cudaMalloc(&d_input, input_bytes);                                 \
+            cudaStream_t h2d_stream;                                           \
+            cudaStreamCreate(&h2d_stream);                                     \
+            cudaMemcpyAsync(d_input, h_input, input_bytes,                     \
+                            cudaMemcpyHostToDevice, h2d_stream);               \
+            cudaStreamSynchronize(h2d_stream);                                 \
+            cudaStreamDestroy(h2d_stream);                                     \
+                                                                               \
+            jtfs_engine.forward_pass(d_input, d_output, signal_len,            \
+                                     batch_size, depth);                       \
+            jtfs_engine.destroy();                                             \
+            cudaFree(d_input);                                                 \
+        }                                                                      \
+        dispatched = true;                                                     \
+    }
+
 // ---------------------------------------------------------------------------
 // run_wst_pipeline — Primary FFI entry point called by the Rust orchestrator.
+//
+// The (J, Q) values supplied at runtime are routed through the dispatch matrix
+// below. If no pre-compiled instantiation matches, a std::invalid_argument
+// exception is thrown with a diagnostic message listing all supported configs.
 // ---------------------------------------------------------------------------
 WSTResult run_wst_pipeline(
     uint64_t input_plasma_ptr,
     int32_t  signal_len,
     int32_t  batch_size,
-    int32_t  J,
-    int32_t  Q,
+    int32_t  j,
+    int32_t  q,
     int32_t  depth,
     bool     use_jtfs
 ) {
@@ -52,7 +120,7 @@ WSTResult run_wst_pipeline(
     auto t_start = std::chrono::high_resolution_clock::now();
 
     // --- Validate parameters ---
-    if (signal_len <= 0 || batch_size <= 0 || J <= 0 || Q <= 0 || depth <= 0) {
+    if (signal_len <= 0 || batch_size <= 0 || j <= 0 || q <= 0 || depth <= 0) {
         throw std::runtime_error("run_wst_pipeline: invalid configuration parameters");
     }
 
@@ -73,42 +141,34 @@ WSTResult run_wst_pipeline(
             std::string("cudaMalloc for output tensor failed: ") + cudaGetErrorString(err));
     }
 
-    // --- Execute WST or JTFS pipeline ---
-    if (!use_jtfs) {
-        // Standard WST path: template-specialised on HopperTag for sm_90,
-        // falls back to AmperTag (sm_80) via the TilePolicy mechanism.
-        WSTEngine<HopperTag, 8, 16> engine;
-        engine.initialise(signal_len, batch_size);
+    // ===================================================================
+    // DYNAMIC DISPATCH MATRIX
+    //
+    // Each DISPATCH_WST_ENGINE(J, Q) invocation pre-compiles the full
+    // WSTEngine<HopperTag, J, Q> and JTFSEngine<HopperTag, J, Q, 1>
+    // template instantiations. To add support for a new (J, Q) pair,
+    // simply append a new macro call below — no other changes required.
+    // ===================================================================
+    bool dispatched = false;
 
-        // H2D transfer via async pinned DMA — overlaps with compute on stream1
-        float* d_input = nullptr;
-        cudaMalloc(&d_input, input_bytes);
-        cudaStream_t h2d_stream;
-        cudaStreamCreate(&h2d_stream);
-        cudaMemcpyAsync(d_input, h_input, input_bytes, cudaMemcpyHostToDevice, h2d_stream);
-        cudaStreamSynchronize(h2d_stream);
-        cudaStreamDestroy(h2d_stream);
+    DISPATCH_WST_ENGINE(8,  16)
+    DISPATCH_WST_ENGINE(10, 16)
+    DISPATCH_WST_ENGINE(12, 16)
+    DISPATCH_WST_ENGINE(8,   8)
+    DISPATCH_WST_ENGINE(10,  8)
 
-        engine.forward_pass(d_input, d_output, signal_len, batch_size, depth);
-        engine.destroy();
-        cudaFree(d_input);
-    } else {
-        // JTFS path: launches separable 2D convolution on stream0 (time) and
-        // stream1 (log-frequency) concurrently.
-        JTFSEngine<HopperTag, 8, 16> jtfs_engine(J, Q);
+    if (!dispatched) {
+        // Cleanup before throwing
+        cudaFree(d_output);
+        unregister_plasma_buffer(input_plasma_ptr);
 
-        float* d_input = nullptr;
-        cudaMalloc(&d_input, input_bytes);
-        cudaStream_t h2d_stream;
-        cudaStreamCreate(&h2d_stream);
-        cudaMemcpyAsync(d_input, h_input, input_bytes, cudaMemcpyHostToDevice, h2d_stream);
-        cudaStreamSynchronize(h2d_stream);
-        cudaStreamDestroy(h2d_stream);
-
-        // JTFS forward: streams 0 and 1 run time and frequency convolutions in parallel
-        jtfs_engine.forward_jtfs(d_input, d_output, signal_len, batch_size);
-        jtfs_engine.destroy();
-        cudaFree(d_input);
+        std::ostringstream oss;
+        oss << "run_wst_pipeline: unsupported (J=" << j << ", Q=" << q
+            << ") configuration. Pre-compiled dispatch matrix supports: "
+               "(8,16), (10,16), (12,16), (8,8), (10,8). "
+               "Add a DISPATCH_WST_ENGINE(" << j << ", " << q
+            << ") invocation in wst_bridge.cu to enable this configuration.";
+        throw std::invalid_argument(oss.str());
     }
 
     // Ensure all device work is complete before returning the output pointer
